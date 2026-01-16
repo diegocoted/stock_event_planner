@@ -1,11 +1,22 @@
 
+/**
+ * Stock Events Tracker — app.js
+ * - Fetches 1Y daily close prices via Yahoo Finance through a Cloudflare Worker proxy (CORS-safe)
+ * - Falls back to adjclose when needed + filters null/NaN (prevents y-axis = 1 issue)
+ * - Overlays ±3-day shaded windows for events from events.json
+ * - Renders a responsive Chart.js line chart
+ */
+
+// =================== CONFIG ===================
 const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; // your Worker URL
 const DEFAULT_TICKER = 'AAPL';
-const RANGE = '1y';
-const INTERVAL = '1d';
+const RANGE = '1y';      // '1mo','3mo','6mo','1y','5y','max'
+const INTERVAL = '1d';   // '1d','1wk','1mo'
 
+// =================== UTILITIES ===================
 console.log('app.js loaded', new Date().toISOString());
 
+/** Format UNIX seconds -> 'YYYY-MM-DD' */
 function toYMD(tsSec) {
   const d = new Date(tsSec * 1000);
   const y = d.getFullYear();
@@ -14,8 +25,28 @@ function toYMD(tsSec) {
   return `${y}-${m}-${day}`;
 }
 
+/** Keep only pairs with finite numeric values */
+function cleanSeries(dates, values) {
+  const outDates = [];
+  const outVals = [];
+  for (let i = 0; i < dates.length; i++) {
+    const v = values[i];
+    if (v !== null && v !== undefined && Number.isFinite(v)) {
+      outDates.push(dates[i]);
+      outVals.push(v);
+    }
+  }
+  return { dates: outDates, values: outVals };
+}
+
+// =================== DATA FETCHING ===================
+/**
+ * Fetch stock data via Yahoo Chart API through Cloudflare Worker
+ * Returns: { dates: ['YYYY-MM-DD',...], close: [Number,...] }
+ */
 async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
-  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
+  // Prefer query2 (friendlier). Worker can also rewrite query1->query2.
+  const yahoo = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
   const proxied = `${WORKER}?url=${encodeURIComponent(yahoo)}`;
 
   const res = await fetch(proxied, { cache: 'no-cache' });
@@ -35,127 +66,37 @@ async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   }
 
   const ts = r.timestamp || [];
-  const close = r.indicators?.quote?.[0]?.close || [];
   const dates = ts.map(toYMD);
 
-  if (!dates.length || dates.length !== close.length) {
-    throw new Error('Malformed data: dates/close length mismatch');
+  // Primary series
+  let close = r.indicators?.quote?.[0]?.close || [];
+  const adj = r.indicators?.adjclose?.[0]?.adjclose || [];
+
+  // If 'close' is missing or mostly nulls, fallback to adjclose
+  const closeHasAny = Array.isArray(close) && close.some(v => Number.isFinite(v));
+  if (!closeHasAny && Array.isArray(adj) && adj.some(v => Number.isFinite(v))) {
+    close = adj;
   }
 
-  return { dates, close };
+  // Clean up invalid points so Chart.js gets finite numbers
+  const { dates: cleanDates, values: cleanClose } = cleanSeries(dates, close);
+
+  if (!cleanDates.length || cleanDates.length !== cleanClose.length) {
+    console.warn('Raw points:', dates.length, 'Clean finite points:', cleanDates.length);
+    throw new Error('No valid numeric prices to plot (all values were null/NaN).');
+  }
+
+  // Diagnostics
+  console.log(
+    `Fetched ${cleanDates.length} points for ${ticker}.`,
+    'First:', cleanDates[0], cleanClose[0],
+    'Last:', cleanDates[cleanDates.length - 1], cleanClose[cleanDates.length - 1]
+  );
+
+  return { dates: cleanDates, close: cleanClose };
 }
 
+/** Load events.json and filter by ticker (case-insensitive) */
 async function getEvents(ticker) {
   const res = await fetch('events.json', { cache: 'no-cache' });
   if (!res.ok) {
-    console.warn('events.json missing or not public. Proceeding without events.');
-    return [];
-  }
-  const all = await res.json().catch((e) => {
-    console.warn('events.json parse error:', e.message);
-    return [];
-  });
-  return (all || []).filter(e => (e.ticker || '').toUpperCase() === ticker.toUpperCase());
-}
-
-function buildWindowAnnotations(dates, events) {
-  const anns = {};
-  const toIndex = Object.fromEntries(dates.map((d, i) => [d, i]));
-  for (const ev of events) {
-    const idx = toIndex[ev.date];
-    if (idx === undefined) continue;
-    const startIdx = Math.max(0, idx - 3);
-    const endIdx = Math.min(dates.length - 1, idx + 3);
-    const xMin = dates[startIdx];
-    const xMax = dates[endIdx];
-    const id = `ev_${(ev.ticker || '').toUpperCase()}_${ev.date}_${Math.random().toString(36).slice(2, 7)}`;
-    anns[id] = {
-      type: 'box',
-      xMin,
-      xMax,
-      backgroundColor: 'rgba(255, 206, 86, 0.15)',
-      borderWidth: 0,
-      label: {
-        display: true,
-        content: ev.label || 'Event',
-        position: 'start',
-        color: '#6b7280',
-        backgroundColor: 'rgba(255,255,255,0.0)'
-      }
-    };
-  }
-  return anns;
-}
-
-let chart;
-function renderChart(dates, close, annotations) {
-  const canvas = document.getElementById('chart');
-  if (!canvas) return console.error('Canvas #chart not found');
-  const ctx = canvas.getContext('2d');
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [{
-        label: 'Close',
-        data: close,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.10)',
-        fill: true,
-        pointRadius: 0,
-        tension: 0.2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      parsing: false,
-      scales: {
-        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd' }, ticks: { autoSkip: true, maxTicksLimit: 10 } },
-        y: { beginAtZero: false, ticks: { callback: (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : v) } }
-      },
-      plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false }, annotation: { annotations } },
-      interaction: { mode: 'index', intersect: false }
-    }
-  });
-}
-
-async function loadChart(ticker, range = RANGE, interval = INTERVAL) {
-  const btn = document.getElementById('loadBtn');
-  try {
-    if (btn) btn.disabled = true;
-    const [{ dates, close }, events] = await Promise.all([ getStockData(ticker, range, interval), getEvents(ticker) ]);
-    const annotations = buildWindowAnnotations(dates, events);
-    renderChart(dates, close, annotations);
-  } catch (err) {
-    console.error(err);
-    alert(`Error loading ${ticker}: ${err.message}`);
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-function wireUI() {
-  const input = document.getElementById('ticker');
-  const btn = document.getElementById('loadBtn');
-  if (btn) {
-    btn.addEventListener('click', () => {
-      const t = (input?.value || '').trim().toUpperCase();
-      if (!t) return alert('Enter a ticker (e.g., AAPL)');
-      loadChart(t);
-    });
-  }
-  if (input) {
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn?.click(); });
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('Chart.js present? ', typeof Chart);
-  const tInput = document.getElementById('ticker');
-  if (tInput) tInput.value = DEFAULT_TICKER;
-  wireUI();
-  loadChart(DEFAULT_TICKER);
-});
-``
