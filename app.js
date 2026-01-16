@@ -1,21 +1,11 @@
 
-/**
- * Stock Events Tracker — app.js
- * Uses Cloudflare Worker proxy to fetch Yahoo Finance data (CORS-safe)
- * Overlays ±3-day shaded windows for events from events.json
- * Renders responsive Chart.js line chart
- */
-
-// =================== CONFIG ===================
 const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; // your Worker URL
 const DEFAULT_TICKER = 'AAPL';
-const RANGE = '1y';      // '1mo','3mo','6mo','1y','5y','max'
-const INTERVAL = '1d';   // '1d','1wk','1mo'
+const RANGE = '1y';
+const INTERVAL = '1d';
 
-// =================== UTILITIES ===================
 console.log('app.js loaded', new Date().toISOString());
 
-/** Format UNIX seconds -> 'YYYY-MM-DD' */
 function toYMD(tsSec) {
   const d = new Date(tsSec * 1000);
   const y = d.getFullYear();
@@ -24,8 +14,6 @@ function toYMD(tsSec) {
   return `${y}-${m}-${day}`;
 }
 
-// =================== DATA FETCHING ===================
-/** Fetch stock data via Yahoo Chart API through Cloudflare Worker */
 async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
   const proxied = `${WORKER}?url=${encodeURIComponent(yahoo)}`;
@@ -57,7 +45,6 @@ async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   return { dates, close };
 }
 
-/** Load events.json and filter by ticker (case-insensitive) */
 async function getEvents(ticker) {
   const res = await fetch('events.json', { cache: 'no-cache' });
   if (!res.ok) {
@@ -71,21 +58,16 @@ async function getEvents(ticker) {
   return (all || []).filter(e => (e.ticker || '').toUpperCase() === ticker.toUpperCase());
 }
 
-// =================== ANNOTATIONS (±3 DAY WINDOWS) ===================
-/** Build Chart.js Annotation plugin boxes for ±3 trading days around event date */
 function buildWindowAnnotations(dates, events) {
   const anns = {};
   const toIndex = Object.fromEntries(dates.map((d, i) => [d, i]));
-
   for (const ev of events) {
     const idx = toIndex[ev.date];
     if (idx === undefined) continue;
-
     const startIdx = Math.max(0, idx - 3);
     const endIdx = Math.min(dates.length - 1, idx + 3);
     const xMin = dates[startIdx];
     const xMax = dates[endIdx];
-
     const id = `ev_${(ev.ticker || '').toUpperCase()}_${ev.date}_${Math.random().toString(36).slice(2, 7)}`;
     anns[id] = {
       type: 'box',
@@ -102,23 +84,15 @@ function buildWindowAnnotations(dates, events) {
       }
     };
   }
-
   return anns;
 }
 
-// =================== CHART RENDERING ===================
-let chart; // Chart.js instance
-
+let chart;
 function renderChart(dates, close, annotations) {
   const canvas = document.getElementById('chart');
-  if (!canvas) {
-    console.error('Canvas #chart not found');
-    return;
-  }
-
+  if (!canvas) return console.error('Canvas #chart not found');
   const ctx = canvas.getContext('2d');
   if (chart) chart.destroy();
-
   chart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -138,39 +112,20 @@ function renderChart(dates, close, annotations) {
       maintainAspectRatio: false,
       parsing: false,
       scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd' },
-          ticks: { autoSkip: true, maxTicksLimit: 10 }
-        },
-        y: {
-          beginAtZero: false,
-          ticks: {
-            callback: (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : v)
-          }
-        }
+        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd' }, ticks: { autoSkip: true, maxTicksLimit: 10 } },
+        y: { beginAtZero: false, ticks: { callback: (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : v) } }
       },
-      plugins: {
-        legend: { display: true },
-        tooltip: { mode: 'index', intersect: false },
-        annotation: { annotations }
-      },
+      plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false }, annotation: { annotations } },
       interaction: { mode: 'index', intersect: false }
     }
   });
 }
 
-// =================== ORCHESTRATION ===================
 async function loadChart(ticker, range = RANGE, interval = INTERVAL) {
   const btn = document.getElementById('loadBtn');
   try {
     if (btn) btn.disabled = true;
-
-    const [{ dates, close }, events] = await Promise.all([
-      getStockData(ticker, range, interval),
-      getEvents(ticker)
-    ]);
-
+    const [{ dates, close }, events] = await Promise.all([ getStockData(ticker, range, interval), getEvents(ticker) ]);
     const annotations = buildWindowAnnotations(dates, events);
     renderChart(dates, close, annotations);
   } catch (err) {
@@ -181,11 +136,9 @@ async function loadChart(ticker, range = RANGE, interval = INTERVAL) {
   }
 }
 
-// =================== UI WIRING ===================
 function wireUI() {
   const input = document.getElementById('ticker');
   const btn = document.getElementById('loadBtn');
-
   if (btn) {
     btn.addEventListener('click', () => {
       const t = (input?.value || '').trim().toUpperCase();
@@ -193,21 +146,16 @@ function wireUI() {
       loadChart(t);
     });
   }
-
   if (input) {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') btn?.click();
-    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn?.click(); });
   }
 }
 
-// =================== BOOT ===================
 window.addEventListener('DOMContentLoaded', () => {
   console.log('Chart.js present? ', typeof Chart);
-
   const tInput = document.getElementById('ticker');
   if (tInput) tInput.value = DEFAULT_TICKER;
-
   wireUI();
   loadChart(DEFAULT_TICKER);
 });
+``
