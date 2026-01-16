@@ -2,11 +2,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Stock Event Viewer</title>
+  <meta charset="UTF-8" />
+  <title>Stock Events Tracker</title>
+
+  <!-- Link your CSS correctly -->
+  <link rel="stylesheet" href="chart.css" />
+
+  <!-- Chart.js and annotation plugin (from CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
 <body>
-  <h1>Hello! Your site is working 🎉</h1>
-  <p>We will add the chart next.</p>
+  <div class="container">
+    <div class="header">
+      <div class="brand"><strong>Stock Events Tracker</strong></div>
+      <div class="controls">
+        <input id="ticker" type="text" placeholder="AAPL, TSLA…" />
+        <button id="loadBtn">Load Chart</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="legend">Events will be shown with a shaded ±3‑day window.</div>
+    </div>
+
+    <div class="footer">
+      <p>For learning & research. Not investment advice.</p>
+    </div>
+  </div>
+
+  <!-- Your logic -->
+  <script src="app.js"></script>
 </body>
 </html>
