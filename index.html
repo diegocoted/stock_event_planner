@@ -6,16 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stock Events Tracker</title>
 
-  <!-- 1) CSS -->
-  <link rel="stylesheet" href="chart.css" />
+  <!-- CSS (use a cache-busting query param) -->
+  <link rel="stylesheet" href="chart.css?v=20260116a" />
 
-  <!-- 2) Self-hosted JS libraries (ORDER MATTERS) -->
-  <!-- Chart.js core -->
-  <script src="vendor/chart.umd.min.js"></script>
-  <!-- Date adapter for time axis -->
-  <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <!-- Annotation plugin (for shaded ±3-day windows) -->
-  <script src="vendor/chartjs-plugin-annotation.min.js"></script>
+  <!-- Self-hosted JS libraries (ORDER MATTERS). Use defer + versioning -->
+  <script src="vendor/chart.umd.min.js?v=20260116a" defer></script>
+  <script src="vendor/chartjs-adapter-date-fns.bundle.min.js?v=20260116a" defer></script>
+  <script src="vendor/chartjs-plugin-annotation.min.js?v=20260116a" defer></script>
 </head>
 <body>
   <div class="container">
@@ -39,7 +36,7 @@
     </div>
   </div>
 
-  <!-- 3) Your app logic should be loaded LAST -->
-  <script src="app.js"></script>
+  <!-- Your app logic LAST, with a new filename + version -->
+  <script src="app.v3.js?v=20260116a" defer></script>
 </body>
 </html>
