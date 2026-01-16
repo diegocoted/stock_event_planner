@@ -5,10 +5,10 @@
   <meta charset="UTF-8" />
   <title>Stock Events Tracker</title>
 
-  <!-- Link your CSS -->
+  <!-- CSS -->
   <link rel="stylesheet" href="chart.css" />
 
-  <!-- Self-hosted Chart.js + adapter + annotation plugin -->
+  <!-- Self-hosted JS (order matters): Chart.js -> date adapter -> annotation plugin -->
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="vendor/chartjs-plugin-annotation.min.js"></script>
@@ -35,7 +35,7 @@
     </div>
   </div>
 
+  <!-- Your app logic, loaded last -->
   <script src="app.js"></script>
 </body>
 </html>
-``
