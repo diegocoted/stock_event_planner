@@ -98,3 +98,116 @@ function buildWindowAnnotations(dates, events) {
         content: ev.label || 'Event',
         position: 'start',
         color: '#6b7280',
+        backgroundColor: 'rgba(255,255,255,0.0)'
+      }
+    };
+  }
+
+  return anns;
+}
+
+// =================== CHART RENDERING ===================
+let chart; // Chart.js instance
+
+function renderChart(dates, close, annotations) {
+  const canvas = document.getElementById('chart');
+  if (!canvas) {
+    console.error('Canvas #chart not found');
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: 'Close',
+        data: close,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.10)',
+        fill: true,
+        pointRadius: 0,
+        tension: 0.2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false,
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'day', tooltipFormat: 'yyyy-MM-dd' },
+          ticks: { autoSkip: true, maxTicksLimit: 10 }
+        },
+        y: {
+          beginAtZero: false,
+          ticks: {
+            callback: (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : v)
+          }
+        }
+      },
+      plugins: {
+        legend: { display: true },
+        tooltip: { mode: 'index', intersect: false },
+        annotation: { annotations }
+      },
+      interaction: { mode: 'index', intersect: false }
+    }
+  });
+}
+
+// =================== ORCHESTRATION ===================
+async function loadChart(ticker, range = RANGE, interval = INTERVAL) {
+  const btn = document.getElementById('loadBtn');
+  try {
+    if (btn) btn.disabled = true;
+
+    const [{ dates, close }, events] = await Promise.all([
+      getStockData(ticker, range, interval),
+      getEvents(ticker)
+    ]);
+
+    const annotations = buildWindowAnnotations(dates, events);
+    renderChart(dates, close, annotations);
+  } catch (err) {
+    console.error(err);
+    alert(`Error loading ${ticker}: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// =================== UI WIRING ===================
+function wireUI() {
+  const input = document.getElementById('ticker');
+  const btn = document.getElementById('loadBtn');
+
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const t = (input?.value || '').trim().toUpperCase();
+      if (!t) return alert('Enter a ticker (e.g., AAPL)');
+      loadChart(t);
+    });
+  }
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btn?.click();
+    });
+  }
+}
+
+// =================== BOOT ===================
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('Chart.js present? ', typeof Chart);
+
+  const tInput = document.getElementById('ticker');
+  if (tInput) tInput.value = DEFAULT_TICKER;
+
+  wireUI();
+  loadChart(DEFAULT_TICKER);
+});
