@@ -1,4 +1,7 @@
 
+console.log("app.js loaded", new Date().toISOString());
+console.log("Chart.js present? ", typeof Chart);
+
 // app.js — minimal MVP
 
 let chart; // hold the Chart.js instance
