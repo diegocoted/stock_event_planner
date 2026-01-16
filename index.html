@@ -1,18 +1,21 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stock Events Tracker</title>
 
-  <!-- CSS -->
+  <!-- 1) CSS (this must be a <link>, not plain text) -->
   <link rel="stylesheet" href="chart.css" />
 
-  <!-- Self-hosted JS (order matters): Chart.js -> date adapter -> annotation plugin -->
+  <!-- 2) Self-hosted JS libraries (ORDER MATTERS) -->
+  <!-- Chart.js core -->
   <script src="vendor/chart.umd.min.js"></script>
+  <!-- Date adapter for time axis -->
   <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <!-- Annotation plugin (for the shaded ±3-day windows) -->
   <script src="vendor/chartjs-plugin-annotation.min.js"></script>
-  <script src="app.js"></script>  
 </head>
 <body>
   <div class="container">
@@ -28,7 +31,7 @@
       <div class="chart-wrap">
         <canvas id="chart"></canvas>
       </div>
-      <div class="legend">Events will be shown with a shaded ±3‑day window.</div>
+      <div class="legend">Events are shown with a shaded ±3‑day window.</div>
     </div>
 
     <div class="footer">
@@ -36,7 +39,6 @@
     </div>
   </div>
 
-  <!-- Your app logic, loaded last -->
+  <!-- 3) Your app logic should be loaded LAST -->
   <script src="app.js"></script>
 </body>
-</html>
