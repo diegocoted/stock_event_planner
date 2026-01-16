@@ -5,17 +5,15 @@
  * - Overlays ±3 day shaded windows for events from events.json
  * - Renders a responsive Chart.js line chart
  *
- * Requirements in index.html (self-hosted preferred):
+ * Order in index.html (self-hosted preferred):
  *   <script src="vendor/chart.umd.min.js"></script>
  *   <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
  *   <script src="vendor/chartjs-plugin-annotation.min.js"></script>
  *   <script src="app.js"></script>
- *
- * Make sure chart.css gives the canvas a height (aspect-ratio or fixed height).
  */
 
 // =================== CONFIG ===================
-const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; 
+const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; // <-- your Worker URL
 const DEFAULT_TICKER = 'AAPL';
 const RANGE = '1y';         // '1mo','3mo','6mo','1y','5y','max'
 const INTERVAL = '1d';      // '1d','1wk','1mo'
@@ -32,28 +30,19 @@ function toYMD(tsSec) {
   return `${y}-${m}-${day}`;
 }
 
-/** Debounce helper (for future UX upgrades) */
-function debounce(fn, ms = 300) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
-}
-
 // =================== DATA FETCHING ===================
 /**
- * Fetch stock data via Yahoo Chart API through Cloudflare Worker
+ * Fetch stock data via Yahoo Chart API through Cloudflare Worker.
  * Returns: { dates: ['YYYY-MM-DD',...], close: [Number,...] }
  */
 async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
-  const url = `${WORKER}?url=${encodeURIComponent(yahoo)}`;
+  const proxied = `${WORKER}?url=${encodeURIComponent(yahoo)}`;
 
-  const res = await fetch(url, { cache: 'no-cache' });
+  const res = await fetch(proxied, { cache: 'no-cache' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Proxy/Yahoo failed: ${res.status} ${text.slice(0, 120)}`);
+    throw new Error(`Proxy/Yahoo failed: ${res.status} ${text.slice(0, 160)}`);
   }
 
   const json = await res.json().catch((e) => {
@@ -70,7 +59,6 @@ async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   const close = r.indicators?.quote?.[0]?.close || [];
   const dates = ts.map(toYMD);
 
-  // Basic sanity checks
   if (!dates.length || dates.length !== close.length) {
     throw new Error('Malformed data: dates/close length mismatch');
   }
@@ -82,7 +70,7 @@ async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
 async function getEvents(ticker) {
   const res = await fetch('events.json', { cache: 'no-cache' });
   if (!res.ok) {
-    console.warn('events.json not found or invalid. Proceeding without events.');
+    console.warn('events.json missing or not public. Proceeding without events.');
     return [];
   }
   const all = await res.json().catch((e) => {
