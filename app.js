@@ -1,22 +1,16 @@
 
 /**
  * Stock Events Tracker — app.js
- * - Fetches 1Y daily close prices via Yahoo Finance through a Cloudflare Worker proxy
- * - Overlays ±3 day shaded windows for events from events.json
- * - Renders a responsive Chart.js line chart
- *
- * Order in index.html (self-hosted preferred):
- *   <script src="vendor/chart.umd.min.js"></script>
- *   <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
- *   <script src="vendor/chartjs-plugin-annotation.min.js"></script>
- *   <script src="app.js"></script>
+ * Uses Cloudflare Worker proxy to fetch Yahoo Finance data (CORS-safe)
+ * Overlays ±3-day shaded windows for events from events.json
+ * Renders responsive Chart.js line chart
  */
 
 // =================== CONFIG ===================
-const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; // <-- your Worker URL
+const WORKER = 'https://yf-proxy-diego.diego-cote.workers.dev/'; // your Worker URL
 const DEFAULT_TICKER = 'AAPL';
-const RANGE = '1y';         // '1mo','3mo','6mo','1y','5y','max'
-const INTERVAL = '1d';      // '1d','1wk','1mo'
+const RANGE = '1y';      // '1mo','3mo','6mo','1y','5y','max'
+const INTERVAL = '1d';   // '1d','1wk','1mo'
 
 // =================== UTILITIES ===================
 console.log('app.js loaded', new Date().toISOString());
@@ -31,10 +25,7 @@ function toYMD(tsSec) {
 }
 
 // =================== DATA FETCHING ===================
-/**
- * Fetch stock data via Yahoo Chart API through Cloudflare Worker.
- * Returns: { dates: ['YYYY-MM-DD',...], close: [Number,...] }
- */
+/** Fetch stock data via Yahoo Chart API through Cloudflare Worker */
 async function getStockData(ticker, range = RANGE, interval = INTERVAL) {
   const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
   const proxied = `${WORKER}?url=${encodeURIComponent(yahoo)}`;
@@ -81,10 +72,7 @@ async function getEvents(ticker) {
 }
 
 // =================== ANNOTATIONS (±3 DAY WINDOWS) ===================
-/**
- * Build Chart.js Annotation plugin boxes for ±3 trading days around event date.
- * Dates must match labels array values 'YYYY-MM-DD'.
- */
+/** Build Chart.js Annotation plugin boxes for ±3 trading days around event date */
 function buildWindowAnnotations(dates, events) {
   const anns = {};
   const toIndex = Object.fromEntries(dates.map((d, i) => [d, i]));
@@ -103,38 +91,10 @@ function buildWindowAnnotations(dates, events) {
       type: 'box',
       xMin,
       xMax,
-      backgroundColor: 'rgba(255, 206, 86, 0.15)', // amber
+      backgroundColor: 'rgba(255, 206, 86, 0.15)',
       borderWidth: 0,
       label: {
         display: true,
         content: ev.label || 'Event',
         position: 'start',
         color: '#6b7280',
-        backgroundColor: 'rgba(255,255,255,0.0)'
-      }
-    };
-  }
-
-  return anns;
-}
-
-// =================== CHART RENDERING ===================
-let chart; // Chart.js instance
-
-function renderChart(dates, close, annotations) {
-  const canvas = document.getElementById('chart');
-  if (!canvas) {
-    console.error('Canvas #chart not found');
-    return;
-  }
-
-  const ctx = canvas.getContext('2d');
-  if (chart) chart.destroy();
-
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [{
-        label: 'Close',
-        data: close,
