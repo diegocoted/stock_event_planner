@@ -1,42 +1,88 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stock Events Tracker</title>
-
-  <!-- CSS (use a cache-busting query param) -->
-  <link rel="stylesheet" href="chart.css?v=20260116a" />
-
-  <!-- Self-hosted JS libraries (ORDER MATTERS). Use defer + versioning -->
-  <script src="vendor/chart.umd.min.js?v=20260116a" defer></script>
-  <script src="vendor/chartjs-adapter-date-fns.bundle.min.js?v=20260116a" defer></script>
-  <script src="vendor/chartjs-plugin-annotation.min.js?v=20260116a" defer></script>
+    <title>Stock Event Planner</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f4f4f4; }
+        #controls { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; }
+        #chart { height: 500px; width: 100%; }
+        input, button { padding: 8px; margin-right: 10px; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="brand"><strong>Stock Events Tracker</strong></div>
-      <div class="controls">
-        <input id="ticker" type="text" placeholder="AAPL, TSLA…" />
-        <button id="loadBtn">Load Chart</button>
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="chart-wrap">
-        <canvas id="chart"></canvas>
-      </div>
-      <div class="legend">Events are shown with a shaded ±3‑day window.</div>
-    </div>
+<div id="controls">
+    <input type="text" id="symbol" placeholder="Stock Symbol (e.g. AAPL)" value="AAPL">
+    <input type="text" id="newsUrl" placeholder="Paste News Link Here">
+    <input type="date" id="eventDate">
+    <input type="number" id="windowSize" placeholder="Window Days" value="7">
+    <button onclick="updateChart()">Load Stock</button>
+    <button onclick="addEvent()">Add Event</button>
+</div>
 
-    <div class="footer">
-      <p>For learning & research. Not investment advice.</p>
-    </div>
-  </div>
+<div id="chart"></div>
 
-  <!-- Your app logic LAST, with a new filename + version -->
-  <script src="app.v3.js?v=20260116a" defer></script>
+<script>
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+        width: document.getElementById('chart').clientWidth,
+        height: 500,
+        layout: { backgroundColor: '#ffffff' },
+        timeScale: { timeVisible: true, secondsVisible: false }
+    });
+    
+    const lineSeries = chart.addLineSeries();
+    let events = [];
+
+    async function updateChart() {
+        const symbol = document.getElementById('symbol').value;
+        // Note: Using a Demo API Key for example. Get your own at Alpha Vantage.
+        const apiKey = 'demo'; 
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const timeSeries = data["Time Series (Daily)"];
+            
+            const chartData = Object.keys(timeSeries).map(date => ({
+                time: date,
+                value: parseFloat(timeSeries[date]["4. close"])
+            })).sort((a, b) => a.time.localeCompare(b.time));
+
+            lineSeries.setData(chartData);
+        } catch (e) {
+            alert("Error fetching stock data. (Check API limit/Key)");
+        }
+    }
+
+    function addEvent() {
+        const date = document.getElementById('eventDate').value;
+        const url = document.getElementById('newsUrl').value;
+        const windowSize = parseInt(document.getElementById('windowSize').value);
+
+        if(!date) return alert("Select a date");
+
+        // Add visual marker to chart
+        lineSeries.setMarkers([
+            ...events,
+            {
+                time: date,
+                position: 'aboveBar',
+                color: '#f68410',
+                shape: 'arrowDown',
+                text: 'News Event'
+            }
+        ]);
+        
+        events.push({time: date, position: 'aboveBar', color: '#f68410', shape: 'arrowDown'});
+        
+        // Window logic: Highlight the range (Simplified console output)
+        console.log(`Analyzing effect for ${windowSize} days after ${date}`);
+        alert(`Event added. Monitoring ${windowSize} day window for ${url}`);
+    }
+
+    window.onresize = () => chart.applyOptions({ width: document.getElementById('chart').clientWidth });
+</script>
 </body>
 </html>
