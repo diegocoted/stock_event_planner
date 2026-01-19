@@ -2,39 +2,40 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Event Planner</title>
+    <title>Stock News Plotter</title>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        .card { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        #chart { height: 450px; width: 100%; margin: 20px 0; background: #fff; }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        #chart { height: 450px; width: 100%; border: 1px solid #eee; }
         input, button { padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
-        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-blue { background: #2962ff; color: white; border: none; }
-        .btn-green { background: #00c853; color: white; border: none; }
-        button:hover { opacity: 0.8; }
-        .status-tag { font-size: 12px; color: #666; padding: 5px; }
+        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .news-section { margin-top: 20px; padding: 15px; background: #eef2f3; border-radius: 8px; }
+        #status { font-size: 13px; color: #666; margin-left: 10px; align-self: center; }
     </style>
 </head>
 <body>
 
-<div class="card">
+<div class="container">
     <h2>📈 Stock Event Planner</h2>
     
     <div class="controls">
-        <input type="text" id="symbol" value="IBM" placeholder="Ticker (e.g. AAPL)">
-        <button class="btn-blue" onclick="loadStock()">Load Stock Data</button>
-        <span id="apiStatus" class="status-tag">Ready</span>
+        <input type="text" id="symbol" value="AAPL" placeholder="Ticker (e.g. TSLA)">
+        <button onclick="loadStock()">Update Chart</button>
+        <span id="status">Ready</span>
     </div>
 
     <div id="chart"></div>
 
-    <div class="controls" style="background: #f0f4f8; padding: 15px; border-radius: 8px; flex-wrap: wrap;">
-        <input type="date" id="eventDate">
-        <input type="text" id="eventTitle" placeholder="News Title (e.g., CEO Resigns)" style="flex-grow:1">
-        <input type="number" id="window" value="3" style="width: 70px;" title="Days for effect">
-        <button class="btn-green" onclick="addEvent()">Plot News Event</button>
+    <div class="news-section">
+        <h4>Manual News Input</h4>
+        <div class="controls">
+            <input type="date" id="eventDate">
+            <input type="text" id="eventTitle" placeholder="News Title (e.g. New Product Launch)" style="flex-grow:1">
+            <input type="number" id="window" value="3" style="width: 60px;" title="Days to calculate effect">
+            <button onclick="addEvent()" style="background: #00c853;">Plot & Calculate</button>
+        </div>
     </div>
 </div>
 
@@ -42,38 +43,46 @@
     let chart, lineSeries, priceData = [];
     let markers = [];
 
-    // Initialize the chart correctly
-    function initChart() {
+    // Initialize Chart
+    function init() {
         const chartDiv = document.getElementById('chart');
         chart = LightweightCharts.createChart(chartDiv, {
             width: chartDiv.clientWidth,
             height: 450,
-            layout: { backgroundColor: '#ffffff', textColor: '#333' },
-            timeScale: { borderColor: '#cccccc' }
+            layout: { background: { color: '#ffffff' }, textColor: '#333' },
+            timeScale: { borderColor: '#eee', timeVisible: true }
         });
         lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
+        loadStock();
     }
 
     async function loadStock() {
         const symbol = document.getElementById('symbol').value.toUpperCase();
-        const status = document.getElementById('apiStatus');
-        status.innerText = "Loading...";
-
-        // IMPORTANT: Replace 'demo' with your real API key from Alpha Vantage
+        const status = document.getElementById('status');
+        
+        // YOUR API KEY INTEGRATED HERE
         const apiKey = 'LJH4QALA5R7SC0E9'; 
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
+
+        status.innerText = "Loading data...";
 
         try {
             const response = await fetch(url);
             const data = await response.json();
 
-            if (data["Note"] || data["Information"]) {
-                throw new Error("API Limit Reached (5/min). Try again in 60s.");
+            // Error handling for API limits
+            if (data["Note"]) {
+                status.innerText = "Error: API Limit (Wait 1 minute)";
+                return;
             }
 
             const daily = data["Time Series (Daily)"];
-            if (!daily) throw new Error("Invalid Symbol or Data format.");
+            if (!daily) {
+                status.innerText = "Error: Invalid Ticker";
+                return;
+            }
 
+            // Transform data for the chart
             priceData = Object.keys(daily).map(date => ({
                 time: date,
                 value: parseFloat(daily[date]["4. close"])
@@ -81,13 +90,10 @@
 
             lineSeries.setData(priceData);
             chart.timeScale().fitContent();
-            status.innerText = "Successfully Loaded: " + symbol;
+            status.innerText = "Loaded: " + symbol;
 
         } catch (err) {
-            status.innerText = "Error: " + err.message;
-            console.error(err);
-            // Fallback for testing UI if API fails
-            alert("API Failed. Using IBM Demo key? Only IBM works. \nTip: Get a FREE key to use any ticker.");
+            status.innerText = "Connection Error";
         }
     }
 
@@ -96,17 +102,17 @@
         const title = document.getElementById('eventTitle').value;
         const windowSize = parseInt(document.getElementById('window').value);
 
-        if (!date || !title) return alert("Select a date and enter a title.");
+        if (!date || !title) return alert("Enter date and title");
 
-        // Find the price on the event day and X days later
+        // Calculate % change over the window
         const eventIdx = priceData.findIndex(p => p.time === date);
         let effectLabel = "";
 
         if (eventIdx !== -1 && (eventIdx + windowSize) < priceData.length) {
-            const start = priceData[eventIdx].value;
-            const end = priceData[eventIdx + windowSize].value;
-            const change = (((end - start) / start) * 100).toFixed(2);
-            effectLabel = ` (${change > 0 ? '+' : ''}${change}%)`;
+            const startPrice = priceData[eventIdx].value;
+            const endPrice = priceData[eventIdx + windowSize].value;
+            const diff = ((endPrice - startPrice) / startPrice * 100).toFixed(2);
+            effectLabel = ` (${diff > 0 ? '+' : ''}${diff}%)`;
         }
 
         markers.push({
@@ -120,13 +126,11 @@
         lineSeries.setMarkers(markers);
     }
 
-    // Adjust chart size on window resize
     window.addEventListener('resize', () => {
-        chart.applyOptions({ width: document.getElementById('chart').clientWidth });
+        chart.applyOptions({ width: document.querySelector('.container').clientWidth - 50 });
     });
 
-    initChart();
-    loadStock(); // Initial load
+    init();
 </script>
 </body>
 </html>
