@@ -72,7 +72,7 @@
 
         // 2. Fetch with your new API Key
         const apiKey = 'BXEWDOIBDU02295K';
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
 
         status.innerText = "⏳ Loading Full Data...";
         status.style.color = "orange";
