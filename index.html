@@ -2,19 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Event Planner - Pro MVP</title>
+    <title>Stock Event Planner - Pro</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         #chart { height: 500px; width: 100%; margin: 20px 0; border: 1px solid #eee; border-radius: 8px; }
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
         input, button { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover { background: #1e4bd8; }
         .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; }
-        #status { font-size: 13px; color: #666; font-weight: bold; margin-left: auto; border: 1px solid #ddd; padding: 5px 10px; border-radius: 20px; }
-        .unit-label { font-weight: bold; color: #333; margin-right: 15px; }
+        #status { font-size: 13px; color: #666; font-weight: bold; margin-left: auto; border: 1px solid #ddd; padding: 5px 15px; border-radius: 20px; background: #fff; }
+        .window-control { display: flex; align-items: center; background: white; border: 1px solid #ddd; border-radius: 6px; padding-right: 10px; }
+        .unit-label { font-weight: bold; color: #2962ff; font-size: 12px; margin-left: 5px; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -23,25 +24,24 @@
     <h2 style="margin-top:0">📈 Stock Event Planner</h2>
     <div class="controls">
         <input type="text" id="symbol" value="AAPL" style="width: 120px; text-transform: uppercase; font-weight: bold;">
-        <button onclick="loadStock()">Load Full History</button>
+        <button onclick="loadStock()">Get Full History</button>
         <span id="status">Ready</span>
     </div>
 
     <div id="chart"></div>
 
     <div class="news-box">
-        <h4 style="margin-top:0; margin-bottom:15px;">Add News Event & Analyze Window</h4>
+        <h4 style="margin-top:0; margin-bottom:15px;">Analyze News Impact</h4>
         <div class="controls">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Enter News Headline" style="flex-grow: 1;">
+            <input type="text" id="eventTitle" placeholder="Headline (e.g. Earnings Beat)" style="flex-grow: 1;">
             
-            <div style="display:flex; align-items:center; background: white; border: 1px solid #ddd; padding-left: 10px; border-radius: 6px;">
-                <span style="font-size: 12px; color: #666;">Window:</span>
+            <div class="window-control">
                 <input type="number" id="window" value="3" min="1" max="10" style="width: 50px; border: none;">
-                <span class="unit-label">Days</span>
+                <span class="unit-label">Days Window</span>
             </div>
             
-            <button onclick="addEvent()" style="background: #28a745;">Plot & Calculate Effect</button>
+            <button onclick="addEvent()" style="background: #28a745;">Plot & Calculate</button>
         </div>
     </div>
 </div>
@@ -57,8 +57,6 @@
             height: 500,
             layout: { backgroundColor: '#ffffff', textColor: '#333' },
             timeScale: { borderColor: '#eee', rightOffset: 10, barSpacing: 3, minBarSpacing: 0.1 },
-            handleScroll: true,
-            handleScale: true,
         });
         lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
     }
@@ -68,28 +66,28 @@
         const apiKey = 'LJH4QALA5R7SC0E9'; 
         const status = document.getElementById('status');
         
-        // FORCING outputsize=full for maximum historical data
+        // Use full history to allow deep navigation
         const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
 
-        status.innerText = "⏳ Fetching Full Data...";
-        status.style.background = "#fff3cd";
+        status.innerText = "⌛ Downloading Full History...";
+        status.style.color = "#856404";
 
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            if (data["Note"]) { 
-                status.innerText = "⚠️ API Limit Reached (Wait 60s)"; 
+            if (data["Note"] || data["Information"]) { 
+                status.innerText = "⚠️ API Busy. Wait 60s."; 
                 return; 
             }
             
             const daily = data["Time Series (Daily)"];
             if (!daily) { 
-                status.innerText = "❌ Ticker Not Found"; 
+                status.innerText = "❌ Ticker Not Recognized"; 
                 return; 
             }
 
-            // Map and sort data
+            // Processing large dataset
             priceData = Object.keys(daily).map(d => ({
                 time: d,
                 value: parseFloat(daily[d]["4. close"])
@@ -97,10 +95,10 @@
 
             lineSeries.setData(priceData);
             chart.timeScale().fitContent();
-            status.innerText = "✅ Full " + symbol + " History Loaded";
-            status.style.background = "#d4edda";
+            status.innerText = "✅ " + symbol + " Full Data Loaded";
+            status.style.color = "#155724";
         } catch (e) {
-            status.innerText = "❌ Connection Error";
+            status.innerText = "❌ Fetch Failed";
         }
     }
 
@@ -109,31 +107,31 @@
         const title = document.getElementById('eventTitle').value;
         const win = parseInt(document.getElementById('window').value);
 
-        if(!date || !title) return alert("Please select a date and enter a headline.");
+        if(!date || !title) return alert("Select a date and enter a headline.");
 
         const idx = priceData.findIndex(p => p.time === date);
-        if(idx === -1) return alert("Date not found. Note: The market is closed on weekends/holidays.");
+        if(idx === -1) return alert("Date not found. Markets are closed on weekends/holidays.");
 
         let effects = [];
-        const startPrice = priceData[idx].value;
+        const base = priceData[idx].value;
 
-        // Multi-day calculation with clear labeling
+        // Creating specific 'Day X' labels
         for (let i = 1; i <= win; i++) {
             if (idx + i < priceData.length) {
-                const currentPrice = priceData[idx + i].value;
-                const chg = ((currentPrice - startPrice) / startPrice * 100).toFixed(2);
-                effects.push(`Day ${i}: ${chg > 0 ? '+' : ''}${chg}%`);
+                const current = priceData[idx + i].value;
+                const change = ((current - base) / base * 100).toFixed(2);
+                effects.push(`Day ${i}: ${change > 0 ? '+' : ''}${change}%`);
             }
         }
 
-        const fullLabel = `${title}\n[${effects.join(" | ")}]`;
+        const label = `${title}\n[${effects.join(" | ")}]`;
 
         markers.push({ 
             time: date, 
             position: 'aboveBar', 
             color: '#f68410', 
             shape: 'pin', 
-            text: fullLabel 
+            text: label 
         });
         
         lineSeries.setMarkers(markers);
