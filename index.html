@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Planner - GitHub Fixed</title>
+    <title>Event Planner - Pro Data</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         #chart { height: 480px; width: 100%; margin-bottom: 20px; border: 1px solid #e1e4e8; border-radius: 10px; background: #fff; }
         .year-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
         .btn-year { padding: 8px 18px; font-size: 13px; background: #f1f3f5; border: 1px solid #dee2e6; border-radius: 20px; cursor: pointer; transition: 0.3s; font-weight: 500; }
@@ -32,17 +31,17 @@
         <div id="status">Ready</div>
     </div>
 
-    <div class="controls" style="margin-bottom: 20px;">
-        <input type="text" id="symbol" placeholder="e.g. AAPL.US" style="width: 120px; text-transform: uppercase;">
+    <div class="controls" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+        <input type="text" id="symbol" placeholder="e.g. AAPL" style="width: 120px; text-transform: uppercase;">
         <button class="btn-primary" onclick="loadStock()">Load Data</button>
-        <p style="font-size: 11px; color: #888; margin: 0;">Use <b>.US</b> for US stocks</p>
+        <button style="font-size: 10px; border: none; background: none; color: #999; cursor: pointer;" onclick="resetKey()">Reset Key</button>
     </div>
 
     <div id="yearBar" class="year-bar"></div>
     <div id="chart"></div>
 
     <div class="event-form">
-        <div class="controls" style="margin:0;">
+        <div class="controls" style="display:flex; gap:10px;">
             <input type="date" id="eventDate">
             <input type="text" id="eventTitle" placeholder="Event Headline..." style="flex-grow:1;">
             <input type="number" id="window" value="3" style="width: 50px; text-align: center;">
@@ -64,7 +63,7 @@
         chart = LightweightCharts.createChart(chartElement, {
             width: chartElement.clientWidth,
             height: 480,
-            priceScale: { scaleMargins: { top: 0.40, bottom: 0.05 } }, // Space for labels
+            priceScale: { scaleMargins: { top: 0.40, bottom: 0.05 } },
             timeScale: { borderColor: '#e1e4e8', barSpacing: 10 }
         });
         lineSeries = chart.addLineSeries({ color: '#007bff', lineWidth: 2 });
@@ -75,7 +74,7 @@
         const bar = document.getElementById('yearBar');
         bar.innerHTML = '<button id="btn-365" class="btn-year active" onclick="switchView(\'365\', this)">Last 365 Days</button>';
         const currentYear = new Date().getFullYear();
-        for (let y = currentYear; y >= currentYear - 8; y--) {
+        for (let y = currentYear; y >= currentYear - 5; y--) {
             const btn = document.createElement('button');
             btn.className = 'btn-year';
             btn.innerText = y;
@@ -87,31 +86,35 @@
     async function loadStock() {
         const sym = document.getElementById('symbol').value.toUpperCase().trim();
         if(!sym) return;
+
+        let key = localStorage.getItem('tiingo_key');
+        if (!key) {
+            key = prompt("Enter your Tiingo API Key:");
+            if (key) localStorage.setItem('tiingo_key', key);
+            else return;
+        }
+
         currentSymbol = sym;
-        const status = document.getElementById('status');
-        status.innerText = "⏳ Fetching Data...";
+        document.getElementById('status').innerText = "⏳ Loading Data...";
 
         try {
-            // Using a CORS Proxy to bypass GitHub-to-Stooq blocking
-            const proxy = "https://corsproxy.io/?"; 
-            const target = `https://stooq.com/q/d/l/?s=${sym}&i=d`;
+            // Tiingo handles CORS correctly, no proxy needed!
+            const url = `https://api.tiingo.com/tiingo/daily/${sym}/prices?startDate=2018-01-01&token=${key}`;
+            const response = await fetch(url);
+            const data = await response.json();
             
-            const response = await fetch(proxy + encodeURIComponent(target));
-            const csvText = await response.text();
-            
-            if (csvText.includes("Not Found")) throw new Error();
+            if (data.detail) throw new Error(data.detail);
 
-            const lines = csvText.split('\n').slice(1);
-            allData = lines.map(line => {
-                const cols = line.split(',');
-                if (cols.length < 5) return null;
-                return { time: cols[0], value: parseFloat(cols[4]) };
-            }).filter(d => d !== null && !isNaN(d.value));
+            allData = data.map(d => ({
+                time: d.date.split('T')[0],
+                value: d.close
+            })).sort((a,b) => a.time.localeCompare(b.time));
 
-            status.innerText = `✅ ${sym} Loaded`;
+            document.getElementById('status').innerText = `✅ ${sym} Loaded`;
             switchView('365', document.getElementById('btn-365'));
         } catch (e) {
-            status.innerText = "❌ CORS or Ticker Error";
+            document.getElementById('status').innerText = "❌ Error: Check Ticker/Key";
+            console.error(e);
         }
     }
 
@@ -157,6 +160,11 @@
 
         const row = `<tr><td>${date}</td><td>${currentSymbol}</td><td>${title}</td><td>${win}d</td><td class="${pct >= 0 ? 'pct-pos' : 'pct-neg'}">${outcome}</td></tr>`;
         document.getElementById('eventBody').insertAdjacentHTML('afterbegin', row);
+    }
+
+    function resetKey() {
+        localStorage.removeItem('tiingo_key');
+        alert("Key cleared.");
     }
 
     window.onload = init;
