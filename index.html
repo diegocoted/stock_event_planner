@@ -9,15 +9,24 @@
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h1 { margin-top: 0; color: #333; font-size: 24px; }
-        #chart { height: 480px; width: 100%; margin: 20px 0; border: 1px solid #eee; border-radius: 8px; }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        input, button { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        
+        /* Chart & Controls */
+        #chart { height: 500px; width: 100%; margin: 10px 0 20px 0; border: 1px solid #eee; border-radius: 8px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        
+        /* Year Buttons Bar */
+        .year-bar { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #eee; white-space: nowrap; }
+        .btn-year { padding: 6px 12px; font-size: 13px; background: #e9ecef; color: #333; border: none; border-radius: 15px; cursor: pointer; transition: 0.2s; }
+        .btn-year:hover { background: #dee2e6; }
+        .btn-year.active { background: #2962ff; color: white; }
+
+        /* Inputs */
+        input, button.main-btn { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        button.main-btn { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        
+        /* Tables & News Box */
         .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; margin-bottom: 25px; }
         #status { font-size: 12px; font-weight: bold; padding: 5px 15px; border-radius: 20px; background: #eee; margin-left: auto; }
-        .window-wrapper { display: flex; align-items: center; background: white; border: 1px solid #ddd; padding: 0 10px; border-radius: 6px; }
-        
-        /* Event Table Styles */
         .table-section { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
         .table-container { max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -26,142 +35,3 @@
         .pct-pos { color: #28a745; font-weight: bold; }
         .pct-neg { color: #dc3545; font-weight: bold; }
     </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>📈 Stock Event Planner</h1>
-    
-    <div class="controls">
-        <input type="text" id="symbol" placeholder="TICKER" style="width: 120px; text-transform: uppercase;">
-        <button onclick="handleLoad()">Load Stock</button>
-        <span id="status">Ready</span>
-    </div>
-
-    <div id="chart"></div>
-
-    <div class="news-box">
-        <h4 style="margin-top:0; margin-bottom:15px;">Add News Event</h4>
-        <div class="controls">
-            <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Headline (e.g. Earnings)" style="flex-grow: 1;">
-            <div class="window-wrapper">
-                <input type="number" id="window" value="2" min="1" style="width: 40px; border: none;">
-                <span style="font-size: 12px; font-weight: bold; color: #666; margin-left: 5px;">Days</span>
-            </div>
-            <button onclick="addEvent()" style="background: #28a745;">Plot & Store</button>
-        </div>
-    </div>
-
-    <div class="table-section">
-        <h3 style="margin-top:0">Stored Events History</h3>
-        <div class="table-container">
-            <table id="eventTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Ticker</th>
-                        <th>Headline</th>
-                        <th>Window</th>
-                        <th>Outcome</th>
-                    </tr>
-                </thead>
-                <tbody id="eventBody"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<script>
-    let chart, lineSeries, priceData = [], markers = [];
-    const apiKey = 'BXEWDOIBDU02295K'; 
-
-    function initChart() {
-        const chartElement = document.getElementById('chart');
-        chart = LightweightCharts.createChart(chartElement, {
-            width: chartElement.clientWidth,
-            height: 480,
-            layout: { backgroundColor: '#ffffff', textColor: '#333' },
-            timeScale: { borderColor: '#eee', rightOffset: 10, barSpacing: 8 },
-            // Setting margins to give space for top labels
-            priceScale: { 
-                scaleMargins: { top: 0.2, bottom: 0.1 } 
-            }
-        });
-        lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
-    }
-
-    async function handleLoad() {
-        const symbol = document.getElementById('symbol').value.toUpperCase().trim();
-        if(!symbol) return;
-        const status = document.getElementById('status');
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
-
-        status.innerText = "⏳ Loading...";
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            const daily = data["Time Series (Daily)"];
-            if (!daily) { status.innerText = "❌ Not Found"; return; }
-
-            priceData = Object.entries(daily).map(([d, v]) => ({
-                time: d, value: parseFloat(v["4. close"])
-            })).sort((a, b) => a.time.localeCompare(b.time));
-
-            lineSeries.setData(priceData);
-            chart.timeScale().fitContent();
-            status.innerText = `✅ ${symbol} Loaded`;
-            status.style.color = "green";
-        } catch (e) { status.innerText = "❌ Error"; }
-    }
-
-    function addEvent() {
-        const date = document.getElementById('eventDate').value;
-        const title = document.getElementById('eventTitle').value;
-        const win = parseInt(document.getElementById('window').value);
-        const symbol = document.getElementById('symbol').value.toUpperCase();
-
-        if(!date || !title || priceData.length === 0) return alert("Fill all fields.");
-
-        const idx = priceData.findIndex(p => p.time === date);
-        if(idx === -1) return alert("Date not found.");
-
-        const targetIdx = idx + win;
-        let pctLabel = "N/A";
-        let pctValue = 0;
-
-        if (targetIdx < priceData.length) {
-            const startVal = priceData[idx].value;
-            const endVal = priceData[targetIdx].value;
-            pctValue = (((endVal - startVal) / startVal) * 100).toFixed(2);
-            pctLabel = `${pctValue > 0 ? '+' : ''}${pctValue}%`;
-        }
-
-        // CHART LABEL: Using "aboveBar" and "pin" for the vertical line effect
-        const labelText = `${title}\n${pctLabel} - ${win}d`;
-        markers.push({ 
-            time: date, 
-            position: 'aboveBar', 
-            color: '#f68410', 
-            shape: 'pin', 
-            text: labelText,
-            size: 2 // Larger size for better pin visibility
-        });
-        lineSeries.setMarkers(markers.sort((a,b) => a.time.localeCompare(b.time)));
-
-        // TABLE STORAGE: Append to the bottom table
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${date}</td>
-            <td>${symbol}</td>
-            <td>${title}</td>
-            <td>${win} Days</td>
-            <td class="${pctValue >= 0 ? 'pct-pos' : 'pct-neg'}">${pctLabel}</td>
-        `;
-        document.getElementById('eventBody').prepend(row);
-    }
-
-    window.onload = initChart;
-</script>
-</body>
-</html>
