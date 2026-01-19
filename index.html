@@ -3,22 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Event Planner - Smart Load</title>
+    <title>Event Planner - Open Data</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f4f7f9; margin: 0; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
-        #chart { height: 480px; width: 100%; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
-        .year-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
-        .btn-year { padding: 8px 16px; font-size: 13px; background: #f0f0f0; border: none; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
-        .btn-year.active { background: #2962ff; color: white; box-shadow: 0 2px 8px rgba(41,98,255,0.4); }
-        input, button { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; }
-        .btn-load { background: #2962ff; color: white; border: none; font-weight: bold; cursor: pointer; }
-        #status { font-size: 12px; padding: 6px 15px; border-radius: 20px; background: #eee; margin-left: auto; font-weight: bold; color: #555; }
-        .event-form { background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .controls { display: flex; gap: 10px; align-items: center; }
+        #chart { height: 480px; width: 100%; margin-bottom: 20px; border: 1px solid #e1e4e8; border-radius: 10px; background: #fff; }
+        .year-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
+        .btn-year { padding: 8px 18px; font-size: 13px; background: #f1f3f5; border: 1px solid #dee2e6; border-radius: 20px; cursor: pointer; transition: 0.3s; font-weight: 500; }
+        .btn-year.active { background: #007bff; color: white; border-color: #007bff; }
+        input, button { padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        .btn-primary { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; padding: 12px 24px; }
+        #status { font-size: 12px; color: #666; font-weight: bold; }
+        .event-form { background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid #e1e4e8; }
         table { width: 100%; border-collapse: collapse; margin-top: 25px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        th, td { text-align: left; padding: 15px; border-bottom: 1px solid #edf2f7; font-size: 14px; }
         .pct-pos { color: #28a745; font-weight: bold; }
         .pct-neg { color: #dc3545; font-weight: bold; }
     </style>
@@ -26,22 +27,29 @@
 <body>
 
 <div class="container">
-    <div class="controls">
-        <h2 style="margin:0; font-size:22px;">📈 Stock Event Planner</h2>
-        <input type="text" id="symbol" placeholder="TICKER" style="width: 100px; text-transform: uppercase; font-weight: bold;">
-        <button class="btn-load" onclick="initialLoad()">Load Stock</button>
-        <span id="status">Ready</span>
+    <div class="header">
+        <h2 style="margin:0;">📊 Stock Event Planner</h2>
+        <div id="status">Ready to load</div>
+    </div>
+
+    <div class="controls" style="margin-bottom: 20px;">
+        <input type="text" id="symbol" placeholder="SYMBOL (e.g. AAPL.US)" style="width: 180px; text-transform: uppercase;">
+        <button class="btn-primary" onclick="loadStock()">Load Data</button>
+        <p style="font-size: 11px; color: #888; margin-left: 10px;">Note: Use .US for American stocks (e.g. TSLA.US)</p>
     </div>
 
     <div id="yearBar" class="year-bar"></div>
     <div id="chart"></div>
 
     <div class="event-form">
-        <div class="controls" style="margin:0;">
+        <div class="controls" style="margin:0; flex-wrap: wrap;">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Headline..." style="flex-grow:1;">
-            <input type="number" id="window" value="3" style="width: 50px; text-align: center;">
-            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot Effect</button>
+            <input type="text" id="eventTitle" placeholder="Event Headline (e.g. Earnings)" style="flex-grow:1;">
+            <div style="display:flex; align-items:center;">
+                <input type="number" id="window" value="3" style="width: 50px; text-align: center;">
+                <span style="margin-left:5px; font-size: 12px;">Days</span>
+            </div>
+            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot & Save</button>
         </div>
     </div>
 
@@ -52,97 +60,68 @@
 </div>
 
 <script>
-    let chart, lineSeries, currentSymbol = "", allData = [], markers = [], hasFullHistory = false;
+    let chart, lineSeries, currentSymbol = "", allData = [], markers = [];
 
     function init() {
         const chartElement = document.getElementById('chart');
         chart = LightweightCharts.createChart(chartElement, {
             width: chartElement.clientWidth,
             height: 480,
-            priceScale: { scaleMargins: { top: 0.45, bottom: 0.05 } }, // Sticky labels
-            timeScale: { borderColor: '#eee', barSpacing: 12 }
+            priceScale: { scaleMargins: { top: 0.40, bottom: 0.05 } }, // Extra room for labels
+            timeScale: { borderColor: '#e1e4e8', barSpacing: 10 }
         });
-        lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
-        renderYearButtons();
+        lineSeries = chart.addLineSeries({ color: '#007bff', lineWidth: 3 });
+        generateButtons();
     }
 
-    function renderYearButtons() {
+    function generateButtons() {
         const bar = document.getElementById('yearBar');
-        bar.innerHTML = '<button id="btn-365" class="btn-year active" onclick="handleYearClick(\'365\', this)">Last 365 Days</button>';
+        bar.innerHTML = '<button id="btn-365" class="btn-year active" onclick="switchView(\'365\', this)">Last 365 Days</button>';
         const currentYear = new Date().getFullYear();
-        for (let y = currentYear; y >= currentYear - 10; y--) {
+        for (let y = currentYear; y >= currentYear - 8; y--) {
             const btn = document.createElement('button');
             btn.className = 'btn-year';
             btn.innerText = y;
-            btn.id = 'btn-' + y;
-            btn.onclick = () => handleYearClick(y.toString(), btn);
+            btn.onclick = () => switchView(y.toString(), btn);
             bar.appendChild(btn);
         }
     }
 
-    async function initialLoad() {
-        const sym = document.getElementById('symbol').value.toUpperCase().trim();
-        if (!sym) return;
-
-        let key = localStorage.getItem('av_api_key') || prompt("Enter AlphaVantage API Key:");
-        if (key) localStorage.setItem('av_api_key', key);
-        else return;
-
+    async function loadStock() {
+        const sym = document.getElementById('symbol').value.toUpperCase().trim() || "AAPL.US";
         currentSymbol = sym;
-        allData = []; // Clear old data
-        hasFullHistory = false;
-        
-        // Step 1: Just load the compact view first (fastest)
-        await fetchData('compact', key);
-        handleYearClick('365', document.getElementById('btn-365'));
-    }
-
-    async function fetchData(size, key) {
         const status = document.getElementById('status');
-        status.innerText = size === 'full' ? "⏳ Downloading 20yr Data (Please Wait...)" : "⏳ Loading...";
-        
+        status.innerText = "⏳ Fetching from Stooq...";
+
         try {
-            const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${currentSymbol}&outputsize=${size}&apikey=${key}`);
-            const data = await res.json();
-            const series = data["Time Series (Daily)"];
+            // Fetching from Stooq CSV export (Free, No Key)
+            const response = await fetch(`https://stooq.com/q/d/l/?s=${sym}&i=d`);
+            const csvText = await response.text();
             
-            if (!series) {
-                status.innerText = "❌ Limit Reached - Wait 60s";
-                return;
-            }
+            const lines = csvText.split('\n').slice(1); // Remove header
+            allData = lines.map(line => {
+                const cols = line.split(',');
+                if (cols.length < 5) return null;
+                return { time: cols[0], value: parseFloat(cols[4]) }; // Date and Close
+            }).filter(d => d !== null && !isNaN(d.value));
 
-            // Convert to array and merge with cache
-            const formatted = Object.entries(series).map(([d, v]) => ({
-                time: d, value: parseFloat(v["4. close"])
-            }));
-
-            // Smart merge: prevents duplicates while keeping the full history
-            const combined = [...allData, ...formatted];
-            allData = [...new Map(combined.map(item => [item.time, item])).values()]
-                      .sort((a,b) => a.time.localeCompare(b.time));
-            
-            if (size === 'full') hasFullHistory = true;
-            status.innerText = `✅ ${currentSymbol} Ready`;
+            status.innerText = `✅ ${sym} Loaded`;
+            switchView('365', document.getElementById('btn-365'));
         } catch (e) {
-            status.innerText = "❌ Network Error";
+            status.innerText = "❌ Load Failed. Check Ticker.";
         }
     }
 
-    async function handleYearClick(year, btn) {
-        if (!currentSymbol) return;
-
+    function switchView(year, btn) {
+        if (!allData.length) return;
+        
         document.querySelectorAll('.btn-year').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-
-        // Step 2: Only fetch the 'Full' data if they click a year we don't have
-        if (year !== '365' && !hasFullHistory) {
-            await fetchData('full', localStorage.getItem('av_api_key'));
-        }
 
         let filtered = allData;
         if (year === '365') {
             const cutoff = new Date();
-            cutoff.setFullYear(cutoff.getFullYear() - 1);
+            cutoff.setDate(cutoff.getDate() - 365);
             filtered = allData.filter(d => new Date(d.time) >= cutoff);
         } else {
             filtered = allData.filter(d => d.time.startsWith(year));
@@ -151,7 +130,7 @@
         lineSeries.setData(filtered);
         chart.timeScale().fitContent();
         
-        // Re-draw any markers that fall in this year
+        // Refresh markers
         const visibleMarkers = markers.filter(m => filtered.some(d => d.time === m.time));
         lineSeries.setMarkers(visibleMarkers);
     }
@@ -163,7 +142,7 @@
         if (!date || !title || !allData.length) return;
 
         const startIdx = allData.findIndex(d => d.time === date);
-        if (startIdx === -1) return alert("Date not found. Click the correct year button first to load historical data.");
+        if (startIdx === -1) return alert("Market closed on this date. Choose a weekday.");
 
         const targetIdx = startIdx + win;
         let outcome = "N/A", pct = 0;
@@ -173,10 +152,15 @@
             outcome = (pct > 0 ? "+" : "") + pct.toFixed(2) + "%";
         }
 
-        markers.push({ time: date, position: 'aboveBar', color: '#f68410', shape: 'pin', text: `${title}\n${outcome}` });
+        markers.push({
+            time: date,
+            position: 'aboveBar',
+            color: '#f68410',
+            shape: 'pin',
+            text: `${title}\n${outcome}`
+        });
+        
         markers.sort((a, b) => a.time.localeCompare(b.time));
-
-        // Refresh markers on chart
         lineSeries.setMarkers(markers);
 
         const row = `<tr><td>${date}</td><td>${currentSymbol}</td><td>${title}</td><td>${win}d</td><td class="${pct >= 0 ? 'pct-pos' : 'pct-neg'}">${outcome}</td></tr>`;
