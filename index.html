@@ -6,137 +6,140 @@
     <title>Stock Event Planner</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f4f7f9; margin: 0; }
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f4f7f9; margin: 0; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
-        #chart { height: 450px; width: 100%; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
-        .year-bar { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
-        .btn-year { padding: 6px 12px; font-size: 12px; background: #eee; border: none; border-radius: 15px; cursor: pointer; white-space: nowrap; }
-        .btn-year.active { background: #2962ff; color: white; }
-        input, button { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        #chart { height: 500px; width: 100%; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
+        .year-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
+        .btn-year { padding: 8px 16px; font-size: 13px; background: #f0f0f0; border: none; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+        .btn-year.active { background: #2962ff; color: white; box-shadow: 0 2px 8px rgba(41,98,255,0.4); }
+        input, button { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
         .btn-load { background: #2962ff; color: white; border: none; font-weight: bold; cursor: pointer; }
-        #status { font-size: 12px; padding: 4px 12px; border-radius: 12px; background: #f0f0f0; margin-left: auto; }
-        .event-form { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        .pct-pos { color: green; font-weight: bold; }
-        .pct-neg { color: red; font-weight: bold; }
+        #status { font-size: 12px; padding: 6px 15px; border-radius: 20px; background: #eee; margin-left: auto; font-weight: bold; }
+        .event-form { background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { color: #666; font-weight: 600; }
+        .pct-pos { color: #28a745; font-weight: bold; }
+        .pct-neg { color: #dc3545; font-weight: bold; }
+        .key-btn { font-size: 10px; background: none; border: none; color: #999; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="controls">
-        <h2 style="margin:0; font-size:20px;">📈 Stock Event Planner</h2>
-        <input type="text" id="symbol" placeholder="TICKER" style="width: 80px; text-transform: uppercase;">
+        <h2 style="margin:0; font-size:22px;">📊 Stock Event Planner</h2>
+        <input type="text" id="symbol" placeholder="TICKER" style="width: 100px; text-transform: uppercase; font-weight: bold;">
         <button class="btn-load" onclick="initialLoad()">Load Stock</button>
-        <span id="status">Waiting for Load...</span>
+        <button class="key-btn" onclick="resetKey()">Reset API Key</button>
+        <span id="status">System Ready</span>
     </div>
 
-    <div id="yearBar" class="year-bar">
-        </div>
-
+    <div id="yearBar" class="year-bar"></div>
     <div id="chart"></div>
 
     <div class="event-form">
         <div class="controls" style="margin:0;">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Event Name (e.g., Earnings)" style="flex-grow:1;">
-            <input type="number" id="window" value="3" style="width: 50px;">
-            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot & Save</button>
+            <input type="text" id="eventTitle" placeholder="Enter Headline (e.g. Fed Rate Hike)" style="flex-grow:1;">
+            <div style="display:flex; align-items:center; background:white; border:1px solid #ddd; border-radius:8px; padding-right:10px;">
+                <input type="number" id="window" value="3" style="width: 45px; border:none; text-align:center;">
+                <span style="font-size:12px; color:#666;">Days</span>
+            </div>
+            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot & Calculate</button>
         </div>
     </div>
 
     <table id="eventTable">
-        <thead><tr><th>Date</th><th>Ticker</th><th>Event</th><th>Window</th><th>Outcome</th></tr></thead>
+        <thead><tr><th>Date</th><th>Ticker</th><th>Headline</th><th>Window</th><th>Outcome</th></tr></thead>
         <tbody id="eventBody"></tbody>
     </table>
 </div>
 
 <script>
     let chart, lineSeries, currentSymbol = "", allData = [], markers = [], hasFullHistory = false;
-    const apiKey = 'U86CSKVMKPUDOCYL';
 
-    // Safety: Ensure chart library is ready before doing anything
-    function initChart() {
+    // --- 1. Startup Logic ---
+    function init() {
         const chartElement = document.getElementById('chart');
         if (typeof LightweightCharts === 'undefined') {
-            console.error("Library not loaded yet...");
-            setTimeout(initChart, 500); // Retry in 500ms
+            document.getElementById('status').innerText = "❌ Library Error";
             return;
         }
 
-        if (chart) return; // Already initialized
-
         chart = LightweightCharts.createChart(chartElement, {
             width: chartElement.clientWidth,
-            height: 450,
-            priceScale: { 
-                scaleMargins: { top: 0.45, bottom: 0.05 }, // Push line down for "Sky" labels
-                autoScale: true 
-            },
-            timeScale: { borderColor: '#eee', barSpacing: 10 }
+            height: 500,
+            priceScale: { scaleMargins: { top: 0.45, bottom: 0.05 } }, // Leave space for sticky labels
+            timeScale: { borderColor: '#eee', barSpacing: 12 }
         });
         
-        lineSeries = chart.addLineSeries({ 
-            color: '#2962ff', 
-            lineWidth: 2,
-            priceLineVisible: false 
-        });
+        lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
+        renderYearButtons();
 
-        generateYearButtons();
-        document.getElementById('status').innerText = "System Ready";
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartElement.clientWidth });
+        });
     }
 
-    function generateYearButtons() {
+    function renderYearButtons() {
         const bar = document.getElementById('yearBar');
         bar.innerHTML = '';
         
-        // 1. Landing Page Button (Default)
-        const btn365 = document.createElement('button');
-        btn365.id = 'btn-365';
-        btn365.className = 'btn-year active';
-        btn365.innerText = 'LAST 365 DAYS';
-        btn365.onclick = () => handleYearClick('365', btn365);
-        bar.appendChild(btn365);
+        // Default Landing View
+        addYearBtn('LAST 365 DAYS', '365', true);
 
-        // 2. Yearly Buttons
+        // Historical Years
         const currentYear = new Date().getFullYear();
         for (let y = currentYear; y >= currentYear - 10; y--) {
-            const btn = document.createElement('button');
-            btn.className = 'btn-year';
-            btn.innerText = y;
-            btn.onclick = () => handleYearClick(y.toString(), btn);
-            bar.appendChild(btn);
+            addYearBtn(y, y.toString(), false);
         }
     }
 
+    function addYearBtn(label, value, isActive) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-year' + (isActive ? ' active' : '');
+        btn.innerText = label;
+        btn.id = 'btn-' + value;
+        btn.onclick = () => handleYearClick(value, btn);
+        document.getElementById('yearBar').appendChild(btn);
+    }
+
+    // --- 2. Data Fetching Logic (Secure) ---
     async function initialLoad() {
         const sym = document.getElementById('symbol').value.toUpperCase().trim();
         if (!sym) return;
-        
+
+        // Secure Key Handling: Prompt if not saved
+        let key = localStorage.getItem('av_api_key');
+        if (!key) {
+            key = prompt("Please enter your AlphaVantage API Key (Stored locally in your browser):");
+            if (key) localStorage.setItem('av_api_key', key);
+            else return;
+        }
+
         currentSymbol = sym;
         hasFullHistory = false;
-        allData = []; // Clear old cache
+        allData = [];
+        markers = [];
         
-        // Default to 'compact' (last 100 days) for instant landing
-        await fetchData('compact');
-        
-        const btn = document.getElementById('btn-365');
-        handleYearClick('365', btn);
+        await fetchData('compact', key);
+        const landingBtn = document.getElementById('btn-365');
+        if(landingBtn) handleYearClick('365', landingBtn);
     }
 
-    async function fetchData(size) {
+    async function fetchData(size, key) {
         const status = document.getElementById('status');
-        status.innerText = `⏳ Fetching ${size}...`;
+        status.innerText = `⏳ Loading...`;
         
         try {
-            const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${currentSymbol}&outputsize=${size}&apikey=${apiKey}`);
+            const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${currentSymbol}&outputsize=${size}&apikey=${key}`);
             const data = await res.json();
             const series = data["Time Series (Daily)"];
             
             if (!series) {
-                status.innerText = "❌ API Error (Limit Reached?)";
+                status.innerText = "❌ API Error (Check Key or Limit)";
                 return;
             }
 
@@ -144,27 +147,29 @@
                 time: d, value: parseFloat(v["4. close"])
             })).sort((a, b) => a.time.localeCompare(b.time));
 
-            // Merge with existing cache
+            // Merge cache
             allData = [...new Map([...allData, ...formatted].map(item => [item.time, item])).values()]
                       .sort((a,b) => a.time.localeCompare(b.time));
             
             if (size === 'full') hasFullHistory = true;
             status.innerText = `✅ ${currentSymbol} Active`;
         } catch (e) {
-            status.innerText = "❌ Network Error";
+            status.innerText = "❌ Connection Failed";
         }
     }
 
+    // --- 3. View Logic ---
     async function handleYearClick(year, btn) {
-        // Visual Switch
+        if (!currentSymbol) return alert("Load a ticker first.");
+
+        // Visual change
         document.querySelectorAll('.btn-year').forEach(b => b.classList.remove('active'));
         if(btn) btn.classList.add('active');
 
-        if (!currentSymbol) return;
-
-        // If specific year requested and we only have compact, get full history
+        // Check if we need to expand history
         if (year !== '365' && !hasFullHistory) {
-            await fetchData('full');
+            const key = localStorage.getItem('av_api_key');
+            await fetchData('full', key);
         }
 
         let filtered = allData;
@@ -176,13 +181,15 @@
             filtered = allData.filter(d => d.time.startsWith(year));
         }
 
-        if(lineSeries) {
-            lineSeries.setData(filtered);
-            chart.timeScale().fitContent();
-            updateMarkersForView(filtered);
-        }
+        lineSeries.setData(filtered);
+        chart.timeScale().fitContent();
+        
+        // Only show markers for visible data
+        const visibleMarkers = markers.filter(m => filtered.some(d => d.time === m.time));
+        lineSeries.setMarkers(visibleMarkers);
     }
 
+    // --- 4. Event Logic ---
     function addEvent() {
         const date = document.getElementById('eventDate').value;
         const title = document.getElementById('eventTitle').value;
@@ -190,7 +197,7 @@
         if (!date || !title || !allData.length) return;
 
         const startIdx = allData.findIndex(d => d.time === date);
-        if (startIdx === -1) return alert("Date not found in loaded data.");
+        if (startIdx === -1) return alert("Date not found (Market closed?)");
 
         const targetIdx = startIdx + win;
         let outcome = "N/A", pct = 0;
@@ -200,37 +207,33 @@
             outcome = (pct > 0 ? "+" : "") + pct.toFixed(2) + "%";
         }
 
-        // Add Marker
+        // Add Marker High in "Sky"
         markers.push({
             time: date,
             position: 'aboveBar',
             color: '#f68410',
             shape: 'pin',
-            text: `${title}\n${outcome} (${win}d)`
+            text: `${title}\n${outcome}`
         });
         
         markers.sort((a, b) => a.time.localeCompare(b.time));
         
-        // Refresh current view
+        // Refresh View
         const activeBtn = document.querySelector('.btn-year.active');
-        const activeText = activeBtn ? activeBtn.innerText : "365";
-        handleYearClick(activeText === 'LAST 365 DAYS' ? '365' : activeText, activeBtn);
+        const activeVal = activeBtn ? activeBtn.id.replace('btn-', '') : '365';
+        handleYearClick(activeVal, activeBtn);
 
-        // Add to Table
+        // Update Table
         const row = `<tr><td>${date}</td><td>${currentSymbol}</td><td>${title}</td><td>${win}d</td><td class="${pct >= 0 ? 'pct-pos' : 'pct-neg'}">${outcome}</td></tr>`;
         document.getElementById('eventBody').insertAdjacentHTML('afterbegin', row);
     }
 
-    function updateMarkersForView(currentViewData) {
-        // Only show markers that exist in the current visible data set
-        const visibleMarkers = markers.filter(m => currentViewData.some(d => d.time === m.time));
-        lineSeries.setMarkers(visibleMarkers);
+    function resetKey() {
+        localStorage.removeItem('av_api_key');
+        alert("API Key cleared. Next load will prompt for a new one.");
     }
 
-    // Initialize only after window and library are fully ready
-    window.addEventListener('load', initChart);
-    window.addEventListener('resize', () => { if(chart) chart.applyOptions({ width: document.getElementById('chart').clientWidth }); });
-
+    window.onload = init;
 </script>
 </body>
 </html>
