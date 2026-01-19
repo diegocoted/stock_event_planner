@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Event Planner - Pro</title>
+    <title>Stock Event Planner - Compact</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f8f9fa; margin: 0; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        #chart { height: 400px; width: 100%; margin: 15px 0; border: 1px solid #eee; border-radius: 8px; }
+        #chart { height: 450px; width: 100%; margin: 15px 0; border: 1px solid #eee; border-radius: 8px; }
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
         input, button { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
         button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
@@ -21,8 +21,8 @@
 
 <div class="container">
     <div class="controls">
-        <input type="text" id="symbol" placeholder="TICKER (e.g. IBM)" style="width: 120px; text-transform: uppercase;">
-        <button onclick="handleLoad()">Load History</button>
+        <input type="text" id="symbol" placeholder="TICKER" style="width: 120px; text-transform: uppercase;">
+        <button onclick="handleLoad()">Load Stock (Compact)</button>
         <span id="status">Ready</span>
     </div>
 
@@ -33,10 +33,10 @@
             <input type="date" id="eventDate">
             <input type="text" id="eventTitle" placeholder="Headline..." style="flex-grow: 1;">
             <div class="window-wrapper">
-                <input type="number" id="window" value="3" min="1" max="10" style="width: 40px; border: none;">
+                <input type="number" id="window" value="2" min="1" max="100" style="width: 40px; border: none;">
                 <span style="font-size: 12px; font-weight: bold;">Days</span>
             </div>
-            <button onclick="addEvent()" style="background: #28a745;">Plot</button>
+            <button onclick="addEvent()" style="background: #28a745;">Plot & Calculate</button>
         </div>
     </div>
 </div>
@@ -49,11 +49,18 @@
         const chartElement = document.getElementById('chart');
         chart = LightweightCharts.createChart(chartElement, {
             width: chartElement.clientWidth,
-            height: 400,
+            height: 450,
             layout: { backgroundColor: '#ffffff', textColor: '#333' },
-            timeScale: { borderColor: '#eee', rightOffset: 5, barSpacing: 3 },
+            timeScale: { borderColor: '#eee', rightOffset: 5, barSpacing: 6 },
         });
-        lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
+        lineSeries = chart.addLineSeries({ 
+            color: '#2962ff', 
+            lineWidth: 2,
+            // Marker configuration to help them stay visible
+            markers: {
+                size: 10
+            }
+        });
     }
 
     async function handleLoad() {
@@ -61,62 +68,39 @@
         if(!symbol) return;
         
         const status = document.getElementById('status');
-        
-        // 1. Check Local Cache (Backup)
-        const cached = localStorage.getItem(`stock_${symbol}`);
-        if(cached) {
-            priceData = JSON.parse(cached);
-            renderData(symbol, true);
-            return;
-        }
-
-        // 2. Fetch with your new API Key
         const apiKey = 'BXEWDOIBDU02295K';
+        
+        // REVERTED TO COMPACT MODE
         const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
 
-        status.innerText = "⏳ Loading Full Data...";
+        status.innerText = "⏳ Loading...";
         status.style.color = "orange";
 
         try {
             const response = await fetch(url);
             const data = await response.json();
             
-            // Check for API limits first
-            if (data["Note"] || data["Information"]) {
-                status.innerText = "⚠️ API Busy. Wait 60s.";
-                return;
-            }
+            if (data["Note"]) { status.innerText = "⚠️ API Busy (60s)"; return; }
 
             const dailyData = data["Time Series (Daily)"];
-            
-            // Critical Fix: Explicitly check if data exists before failing
             if (!dailyData) {
-                console.log("API Response:", data); // Check console for exact error
                 status.innerText = "❌ Ticker Not Found";
                 return;
             }
 
-            // Convert and sort huge datasets
             priceData = Object.entries(dailyData).map(([date, values]) => ({
                 time: date,
                 value: parseFloat(values["4. close"])
             })).sort((a, b) => a.time.localeCompare(b.time));
 
-            // Save for later
-            localStorage.setItem(`stock_${symbol}`, JSON.stringify(priceData));
-            renderData(symbol, false);
+            lineSeries.setData(priceData);
+            chart.timeScale().fitContent();
+            status.innerText = `✅ ${symbol} Loaded`;
+            status.style.color = "green";
 
         } catch (error) {
             status.innerText = "❌ Network Error";
         }
-    }
-
-    function renderData(symbol, fromCache) {
-        lineSeries.setData(priceData);
-        chart.timeScale().fitContent();
-        const status = document.getElementById('status');
-        status.innerText = `✅ ${symbol} Loaded ${fromCache ? '(Backup)' : ''}`;
-        status.style.color = "green";
     }
 
     function addEvent() {
@@ -124,30 +108,35 @@
         const title = document.getElementById('eventTitle').value;
         const win = parseInt(document.getElementById('window').value);
 
-        if(!date || !title || priceData.length === 0) return alert("Load ticker & fill fields first.");
+        if(!date || !title || priceData.length === 0) return alert("Load ticker and fill all fields.");
 
         const idx = priceData.findIndex(p => p.time === date);
-        if(idx === -1) return alert("Markets closed on this date (Weekend/Holiday).");
+        if(idx === -1) return alert("Date not found in current 100-day window.");
 
-        let log = [];
-        const start = priceData[idx].value;
+        let label = title;
+        const targetIdx = idx + win;
 
-        for (let i = 1; i <= win; i++) {
-            if (idx + i < priceData.length) {
-                const val = priceData[idx + i].value;
-                const pct = (((val - start) / start) * 100).toFixed(2);
-                log.push(`D${i}: ${pct > 0 ? '+' : ''}${pct}%`);
-            }
+        // SINGLE PERCENTAGE CALCULATION
+        if (targetIdx < priceData.length) {
+            const startVal = priceData[idx].value;
+            const endVal = priceData[targetIdx].value;
+            const pct = (((endVal - startVal) / startVal) * 100).toFixed(2);
+            label += ` (${pct > 0 ? '+' : ''}${pct}% - ${win} days)`;
+        } else {
+            label += " (Not enough data for window)";
         }
 
+        // POSITION ABOVEBAR WITH PIN SHAPE
         markers.push({ 
             time: date, 
             position: 'aboveBar', 
             color: '#f68410', 
             shape: 'pin', 
-            text: `${title} [${log.join(" | ")}]` 
+            text: label 
         });
         
+        // Sorting markers by time to prevent rendering issues
+        markers.sort((a, b) => a.time.localeCompare(b.time));
         lineSeries.setMarkers(markers);
     }
 
