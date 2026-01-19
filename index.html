@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Event Planner - Pro</title>
+    <title>Stock Event Planner - API Saver</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
@@ -10,8 +10,8 @@
         #chart { height: 500px; width: 100%; margin: 20px 0; border: 1px solid #eee; border-radius: 8px; }
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
         input, button { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #1e4bd8; }
+        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .btn-test { background: #6c757d; font-size: 12px; }
         .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; }
         #status { font-size: 13px; color: #666; font-weight: bold; margin-left: auto; border: 1px solid #ddd; padding: 5px 15px; border-radius: 20px; background: #fff; }
         .window-control { display: flex; align-items: center; background: white; border: 1px solid #ddd; border-radius: 6px; padding-right: 10px; }
@@ -22,9 +22,12 @@
 
 <div class="container">
     <h2 style="margin-top:0">📈 Stock Event Planner</h2>
+    <p style="font-size: 12px; color: #888;">(API calls only run when you click "Load Ticker")</p>
+    
     <div class="controls">
-        <input type="text" id="symbol" value="AAPL" style="width: 120px; text-transform: uppercase; font-weight: bold;">
-        <button onclick="loadStock()">Get Full History</button>
+        <input type="text" id="symbol" placeholder="TICKER (e.g. AAPL)" style="width: 150px; text-transform: uppercase;">
+        <button onclick="loadStock()">Load Ticker (Full History)</button>
+        <button class="btn-test" onclick="loadMockData()">Show Sample (Free)</button>
         <span id="status">Ready</span>
     </div>
 
@@ -34,7 +37,7 @@
         <h4 style="margin-top:0; margin-bottom:15px;">Analyze News Impact</h4>
         <div class="controls">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Headline (e.g. Earnings Beat)" style="flex-grow: 1;">
+            <input type="text" id="eventTitle" placeholder="Headline..." style="flex-grow: 1;">
             
             <div class="window-control">
                 <input type="number" id="window" value="3" min="1" max="10" style="width: 50px; border: none;">
@@ -56,38 +59,36 @@
             width: chartElement.clientWidth,
             height: 500,
             layout: { backgroundColor: '#ffffff', textColor: '#333' },
-            timeScale: { borderColor: '#eee', rightOffset: 10, barSpacing: 3, minBarSpacing: 0.1 },
+            timeScale: { borderColor: '#eee', rightOffset: 10, barSpacing: 3 },
         });
         lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
     }
 
     async function loadStock() {
-        const symbol = document.getElementById('symbol').value.toUpperCase();
+        const symbolInput = document.getElementById('symbol').value;
+        if(!symbolInput) return alert("Please enter a ticker first.");
+        
+        const symbol = symbolInput.toUpperCase();
         const apiKey = 'LJH4QALA5R7SC0E9'; 
         const status = document.getElementById('status');
         
-        // Use full history to allow deep navigation
         const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
 
-        status.innerText = "⌛ Downloading Full History...";
-        status.style.color = "#856404";
+        status.innerText = "⏳ Requesting Data...";
+        status.style.color = "orange";
 
         try {
             const res = await fetch(url);
             const data = await res.json();
             
             if (data["Note"] || data["Information"]) { 
-                status.innerText = "⚠️ API Busy. Wait 60s."; 
+                status.innerText = "⚠️ Limit Reached (Wait 60s)"; 
                 return; 
             }
             
             const daily = data["Time Series (Daily)"];
-            if (!daily) { 
-                status.innerText = "❌ Ticker Not Recognized"; 
-                return; 
-            }
+            if (!daily) { status.innerText = "❌ Ticker Not Found"; return; }
 
-            // Processing large dataset
             priceData = Object.keys(daily).map(d => ({
                 time: d,
                 value: parseFloat(daily[d]["4. close"])
@@ -95,11 +96,28 @@
 
             lineSeries.setData(priceData);
             chart.timeScale().fitContent();
-            status.innerText = "✅ " + symbol + " Full Data Loaded";
-            status.style.color = "#155724";
+            status.innerText = "✅ Data Loaded: " + symbol;
+            status.style.color = "green";
         } catch (e) {
-            status.innerText = "❌ Fetch Failed";
+            status.innerText = "❌ Error Connecting";
         }
+    }
+
+    // This function costs 0 API calls and is great for testing
+    function loadMockData() {
+        const today = new Date();
+        priceData = [];
+        for (let i = 100; i > 0; i--) {
+            const date = new Date();
+            date.setDate(today.getDate() - i);
+            priceData.push({
+                time: date.toISOString().split('T')[0],
+                value: 150 + Math.random() * 20
+            });
+        }
+        lineSeries.setData(priceData);
+        chart.timeScale().fitContent();
+        document.getElementById('status').innerText = "Test Mode Active";
     }
 
     function addEvent() {
@@ -107,7 +125,7 @@
         const title = document.getElementById('eventTitle').value;
         const win = parseInt(document.getElementById('window').value);
 
-        if(!date || !title) return alert("Select a date and enter a headline.");
+        if(!date || !title || priceData.length === 0) return alert("Ensure data is loaded, date is selected, and title is entered.");
 
         const idx = priceData.findIndex(p => p.time === date);
         if(idx === -1) return alert("Date not found. Markets are closed on weekends/holidays.");
@@ -115,7 +133,6 @@
         let effects = [];
         const base = priceData[idx].value;
 
-        // Creating specific 'Day X' labels
         for (let i = 1; i <= win; i++) {
             if (idx + i < priceData.length) {
                 const current = priceData[idx + i].value;
@@ -125,19 +142,11 @@
         }
 
         const label = `${title}\n[${effects.join(" | ")}]`;
-
-        markers.push({ 
-            time: date, 
-            position: 'aboveBar', 
-            color: '#f68410', 
-            shape: 'pin', 
-            text: label 
-        });
-        
+        markers.push({ time: date, position: 'aboveBar', color: '#f68410', shape: 'pin', text: label });
         lineSeries.setMarkers(markers);
     }
 
-    window.onload = () => { initChart(); loadStock(); };
+    window.onload = () => { initChart(); }; // ONLY init chart, NO API CALL
     window.onresize = () => { chart.applyOptions({ width: document.getElementById('chart').clientWidth }); };
 </script>
 </body>
