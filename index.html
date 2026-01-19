@@ -3,37 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Event Planner</title>
+    <title>Stock Event Planner - Smart Load</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f4f7f9; margin: 0; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
-        #chart { height: 500px; width: 100%; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        #chart { height: 480px; width: 100%; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
         .year-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 15px; }
         .btn-year { padding: 8px 16px; font-size: 13px; background: #f0f0f0; border: none; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
         .btn-year.active { background: #2962ff; color: white; box-shadow: 0 2px 8px rgba(41,98,255,0.4); }
-        input, button { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        input, button { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; }
         .btn-load { background: #2962ff; color: white; border: none; font-weight: bold; cursor: pointer; }
-        #status { font-size: 12px; padding: 6px 15px; border-radius: 20px; background: #eee; margin-left: auto; font-weight: bold; }
+        #status { font-size: 12px; padding: 6px 15px; border-radius: 20px; background: #eee; margin-left: auto; font-weight: bold; color: #555; }
         .event-form { background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
         table { width: 100%; border-collapse: collapse; margin-top: 25px; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        th { color: #666; font-weight: 600; }
         .pct-pos { color: #28a745; font-weight: bold; }
         .pct-neg { color: #dc3545; font-weight: bold; }
-        .key-btn { font-size: 10px; background: none; border: none; color: #999; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="controls">
-        <h2 style="margin:0; font-size:22px;">📊 Stock Event Planner</h2>
+        <h2 style="margin:0; font-size:22px;">📈 Stock Event Planner</h2>
         <input type="text" id="symbol" placeholder="TICKER" style="width: 100px; text-transform: uppercase; font-weight: bold;">
         <button class="btn-load" onclick="initialLoad()">Load Stock</button>
-        <button class="key-btn" onclick="resetKey()">Reset API Key</button>
-        <span id="status">System Ready</span>
+        <span id="status">Ready</span>
     </div>
 
     <div id="yearBar" class="year-bar"></div>
@@ -42,12 +39,9 @@
     <div class="event-form">
         <div class="controls" style="margin:0;">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Enter Headline (e.g. Fed Rate Hike)" style="flex-grow:1;">
-            <div style="display:flex; align-items:center; background:white; border:1px solid #ddd; border-radius:8px; padding-right:10px;">
-                <input type="number" id="window" value="3" style="width: 45px; border:none; text-align:center;">
-                <span style="font-size:12px; color:#666;">Days</span>
-            </div>
-            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot & Calculate</button>
+            <input type="text" id="eventTitle" placeholder="Headline..." style="flex-grow:1;">
+            <input type="number" id="window" value="3" style="width: 50px; text-align: center;">
+            <button onclick="addEvent()" style="background:#28a745; color:white; border:none; cursor:pointer; font-weight:bold;">Plot Effect</button>
         </div>
     </div>
 
@@ -60,78 +54,52 @@
 <script>
     let chart, lineSeries, currentSymbol = "", allData = [], markers = [], hasFullHistory = false;
 
-    // --- 1. Startup Logic ---
     function init() {
         const chartElement = document.getElementById('chart');
-        if (typeof LightweightCharts === 'undefined') {
-            document.getElementById('status').innerText = "❌ Library Error";
-            return;
-        }
-
         chart = LightweightCharts.createChart(chartElement, {
             width: chartElement.clientWidth,
-            height: 500,
-            priceScale: { scaleMargins: { top: 0.45, bottom: 0.05 } }, // Leave space for sticky labels
+            height: 480,
+            priceScale: { scaleMargins: { top: 0.45, bottom: 0.05 } }, // Sticky labels
             timeScale: { borderColor: '#eee', barSpacing: 12 }
         });
-        
         lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
         renderYearButtons();
-
-        window.addEventListener('resize', () => {
-            chart.applyOptions({ width: chartElement.clientWidth });
-        });
     }
 
     function renderYearButtons() {
         const bar = document.getElementById('yearBar');
-        bar.innerHTML = '';
-        
-        // Default Landing View
-        addYearBtn('LAST 365 DAYS', '365', true);
-
-        // Historical Years
+        bar.innerHTML = '<button id="btn-365" class="btn-year active" onclick="handleYearClick(\'365\', this)">Last 365 Days</button>';
         const currentYear = new Date().getFullYear();
         for (let y = currentYear; y >= currentYear - 10; y--) {
-            addYearBtn(y, y.toString(), false);
+            const btn = document.createElement('button');
+            btn.className = 'btn-year';
+            btn.innerText = y;
+            btn.id = 'btn-' + y;
+            btn.onclick = () => handleYearClick(y.toString(), btn);
+            bar.appendChild(btn);
         }
     }
 
-    function addYearBtn(label, value, isActive) {
-        const btn = document.createElement('button');
-        btn.className = 'btn-year' + (isActive ? ' active' : '');
-        btn.innerText = label;
-        btn.id = 'btn-' + value;
-        btn.onclick = () => handleYearClick(value, btn);
-        document.getElementById('yearBar').appendChild(btn);
-    }
-
-    // --- 2. Data Fetching Logic (Secure) ---
     async function initialLoad() {
         const sym = document.getElementById('symbol').value.toUpperCase().trim();
         if (!sym) return;
 
-        // Secure Key Handling: Prompt if not saved
-        let key = localStorage.getItem('av_api_key');
-        if (!key) {
-            key = prompt("Please enter your AlphaVantage API Key (Stored locally in your browser):");
-            if (key) localStorage.setItem('av_api_key', key);
-            else return;
-        }
+        let key = localStorage.getItem('av_api_key') || prompt("Enter AlphaVantage API Key:");
+        if (key) localStorage.setItem('av_api_key', key);
+        else return;
 
         currentSymbol = sym;
+        allData = []; // Clear old data
         hasFullHistory = false;
-        allData = [];
-        markers = [];
         
+        // Step 1: Just load the compact view first (fastest)
         await fetchData('compact', key);
-        const landingBtn = document.getElementById('btn-365');
-        if(landingBtn) handleYearClick('365', landingBtn);
+        handleYearClick('365', document.getElementById('btn-365'));
     }
 
     async function fetchData(size, key) {
         const status = document.getElementById('status');
-        status.innerText = `⏳ Loading...`;
+        status.innerText = size === 'full' ? "⏳ Downloading 20yr Data (Please Wait...)" : "⏳ Loading...";
         
         try {
             const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${currentSymbol}&outputsize=${size}&apikey=${key}`);
@@ -139,37 +107,36 @@
             const series = data["Time Series (Daily)"];
             
             if (!series) {
-                status.innerText = "❌ API Error (Check Key or Limit)";
+                status.innerText = "❌ Limit Reached - Wait 60s";
                 return;
             }
 
+            // Convert to array and merge with cache
             const formatted = Object.entries(series).map(([d, v]) => ({
                 time: d, value: parseFloat(v["4. close"])
-            })).sort((a, b) => a.time.localeCompare(b.time));
+            }));
 
-            // Merge cache
-            allData = [...new Map([...allData, ...formatted].map(item => [item.time, item])).values()]
+            // Smart merge: prevents duplicates while keeping the full history
+            const combined = [...allData, ...formatted];
+            allData = [...new Map(combined.map(item => [item.time, item])).values()]
                       .sort((a,b) => a.time.localeCompare(b.time));
             
             if (size === 'full') hasFullHistory = true;
-            status.innerText = `✅ ${currentSymbol} Active`;
+            status.innerText = `✅ ${currentSymbol} Ready`;
         } catch (e) {
-            status.innerText = "❌ Connection Failed";
+            status.innerText = "❌ Network Error";
         }
     }
 
-    // --- 3. View Logic ---
     async function handleYearClick(year, btn) {
-        if (!currentSymbol) return alert("Load a ticker first.");
+        if (!currentSymbol) return;
 
-        // Visual change
         document.querySelectorAll('.btn-year').forEach(b => b.classList.remove('active'));
-        if(btn) btn.classList.add('active');
+        btn.classList.add('active');
 
-        // Check if we need to expand history
+        // Step 2: Only fetch the 'Full' data if they click a year we don't have
         if (year !== '365' && !hasFullHistory) {
-            const key = localStorage.getItem('av_api_key');
-            await fetchData('full', key);
+            await fetchData('full', localStorage.getItem('av_api_key'));
         }
 
         let filtered = allData;
@@ -184,12 +151,11 @@
         lineSeries.setData(filtered);
         chart.timeScale().fitContent();
         
-        // Only show markers for visible data
+        // Re-draw any markers that fall in this year
         const visibleMarkers = markers.filter(m => filtered.some(d => d.time === m.time));
         lineSeries.setMarkers(visibleMarkers);
     }
 
-    // --- 4. Event Logic ---
     function addEvent() {
         const date = document.getElementById('eventDate').value;
         const title = document.getElementById('eventTitle').value;
@@ -197,7 +163,7 @@
         if (!date || !title || !allData.length) return;
 
         const startIdx = allData.findIndex(d => d.time === date);
-        if (startIdx === -1) return alert("Date not found (Market closed?)");
+        if (startIdx === -1) return alert("Date not found. Click the correct year button first to load historical data.");
 
         const targetIdx = startIdx + win;
         let outcome = "N/A", pct = 0;
@@ -207,30 +173,14 @@
             outcome = (pct > 0 ? "+" : "") + pct.toFixed(2) + "%";
         }
 
-        // Add Marker High in "Sky"
-        markers.push({
-            time: date,
-            position: 'aboveBar',
-            color: '#f68410',
-            shape: 'pin',
-            text: `${title}\n${outcome}`
-        });
-        
+        markers.push({ time: date, position: 'aboveBar', color: '#f68410', shape: 'pin', text: `${title}\n${outcome}` });
         markers.sort((a, b) => a.time.localeCompare(b.time));
-        
-        // Refresh View
-        const activeBtn = document.querySelector('.btn-year.active');
-        const activeVal = activeBtn ? activeBtn.id.replace('btn-', '') : '365';
-        handleYearClick(activeVal, activeBtn);
 
-        // Update Table
+        // Refresh markers on chart
+        lineSeries.setMarkers(markers);
+
         const row = `<tr><td>${date}</td><td>${currentSymbol}</td><td>${title}</td><td>${win}d</td><td class="${pct >= 0 ? 'pct-pos' : 'pct-neg'}">${outcome}</td></tr>`;
         document.getElementById('eventBody').insertAdjacentHTML('afterbegin', row);
-    }
-
-    function resetKey() {
-        localStorage.removeItem('av_api_key');
-        alert("API Key cleared. Next load will prompt for a new one.");
     }
 
     window.onload = init;
