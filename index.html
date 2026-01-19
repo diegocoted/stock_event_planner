@@ -2,118 +2,131 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Event Planner - MVP</title>
+    <title>Stock Event Planner</title>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        :root { --primary: #2962ff; --success: #00c853; --bg: #f8f9fa; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
-        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 20px; }
-        #chart { height: 450px; width: 100%; border: 1px solid #eee; border-radius: 8px; }
-        .panel { padding: 15px; border: 1px solid #eee; border-radius: 8px; background: #fff; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .event-list { margin-top: 15px; max-height: 200px; overflow-y: auto; font-size: 13px; }
-        .event-item { padding: 8px; border-bottom: 1px solid #eee; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        .card { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #chart { height: 450px; width: 100%; margin: 20px 0; background: #fff; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        input, button { padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
+        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-blue { background: #2962ff; color: white; border: none; }
+        .btn-green { background: #00c853; color: white; border: none; }
+        button:hover { opacity: 0.8; }
+        .status-tag { font-size: 12px; color: #666; padding: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2 style="margin-top:0">📈 Stock Event Planner</h2>
+<div class="card">
+    <h2>📈 Stock Event Planner</h2>
     
-    <div style="display:flex; gap:10px;">
-        <input type="text" id="symbol" value="IBM" style="width:150px">
-        <button onclick="loadStock()" style="width:150px">Load Ticker</button>
+    <div class="controls">
+        <input type="text" id="symbol" value="IBM" placeholder="Ticker (e.g. AAPL)">
+        <button class="btn-blue" onclick="loadStock()">Load Stock Data</button>
+        <span id="apiStatus" class="status-tag">Ready</span>
     </div>
 
-    <div class="grid">
-        <div id="chart"></div>
-        
-        <div class="panel">
-            <h4>Add News Event</h4>
-            <input type="text" id="newsLink" placeholder="Paste News Link (URL)">
-            <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="News Title/Summary">
-            <button onclick="plotAndSave()" style="background:var(--success)">Plot & Save Event</button>
-            
-            <div class="event-list" id="eventList">
-                <strong>Saved Events:</strong>
-                <div id="items"></div>
-            </div>
-            <button onclick="clearData()" style="background:#ff5252; font-size:10px; margin-top:10px;">Clear All Data</button>
-        </div>
+    <div id="chart"></div>
+
+    <div class="controls" style="background: #f0f4f8; padding: 15px; border-radius: 8px; flex-wrap: wrap;">
+        <input type="date" id="eventDate">
+        <input type="text" id="eventTitle" placeholder="News Title (e.g., CEO Resigns)" style="flex-grow:1">
+        <input type="number" id="window" value="3" style="width: 70px;" title="Days for effect">
+        <button class="btn-green" onclick="addEvent()">Plot News Event</button>
     </div>
 </div>
 
 <script>
     let chart, lineSeries, priceData = [];
-    let savedEvents = JSON.parse(localStorage.getItem('myStockEvents')) || [];
+    let markers = [];
 
-    // 1. Initialize
-    function init() {
-        chart = LightweightCharts.createChart(document.getElementById('chart'), {
-            layout: { textColor: '#444' },
-            grid: { vertLines: { visible: false } },
+    // Initialize the chart correctly
+    function initChart() {
+        const chartDiv = document.getElementById('chart');
+        chart = LightweightCharts.createChart(chartDiv, {
+            width: chartDiv.clientWidth,
+            height: 450,
+            layout: { backgroundColor: '#ffffff', textColor: '#333' },
+            timeScale: { borderColor: '#cccccc' }
         });
-        lineSeries = chart.addLineSeries({ color: var(--primary) });
-        loadStock();
-        renderEventList();
+        lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
     }
 
-    // 2. Load Stock Data
     async function loadStock() {
-        const symbol = document.getElementById('symbol').value;
+        const symbol = document.getElementById('symbol').value.toUpperCase();
+        const status = document.getElementById('apiStatus');
+        status.innerText = "Loading...";
+
+        // IMPORTANT: Replace 'demo' with your real API key from Alpha Vantage
+        const apiKey = 'demo'; 
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+
         try {
-            const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=demo`);
-            const data = await res.json();
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data["Note"] || data["Information"]) {
+                throw new Error("API Limit Reached (5/min). Try again in 60s.");
+            }
+
             const daily = data["Time Series (Daily)"];
-            priceData = Object.keys(daily).map(d => ({time: d, value: parseFloat(daily[d]["4. close"])})).sort((a,b) => a.time.localeCompare(b.time));
+            if (!daily) throw new Error("Invalid Symbol or Data format.");
+
+            priceData = Object.keys(daily).map(date => ({
+                time: date,
+                value: parseFloat(daily[date]["4. close"])
+            })).sort((a, b) => a.time.localeCompare(b.time));
+
             lineSeries.setData(priceData);
-            refreshMarkers();
-        } catch(e) { alert("API Limit reached (IBM works with demo key)"); }
+            chart.timeScale().fitContent();
+            status.innerText = "Successfully Loaded: " + symbol;
+
+        } catch (err) {
+            status.innerText = "Error: " + err.message;
+            console.error(err);
+            // Fallback for testing UI if API fails
+            alert("API Failed. Using IBM Demo key? Only IBM works. \nTip: Get a FREE key to use any ticker.");
+        }
     }
 
-    // 3. Plot and Save to LocalStorage
-    function plotAndSave() {
+    function addEvent() {
         const date = document.getElementById('eventDate').value;
         const title = document.getElementById('eventTitle').value;
-        if(!date || !title) return alert("Date and Title required");
+        const windowSize = parseInt(document.getElementById('window').value);
 
-        const newEvent = { date, title };
-        savedEvents.push(newEvent);
-        localStorage.setItem('myStockEvents', JSON.stringify(savedEvents));
-        
-        refreshMarkers();
-        renderEventList();
-    }
+        if (!date || !title) return alert("Select a date and enter a title.");
 
-    function refreshMarkers() {
-        const markers = savedEvents.map(ev => ({
-            time: ev.date,
+        // Find the price on the event day and X days later
+        const eventIdx = priceData.findIndex(p => p.time === date);
+        let effectLabel = "";
+
+        if (eventIdx !== -1 && (eventIdx + windowSize) < priceData.length) {
+            const start = priceData[eventIdx].value;
+            const end = priceData[eventIdx + windowSize].value;
+            const change = (((end - start) / start) * 100).toFixed(2);
+            effectLabel = ` (${change > 0 ? '+' : ''}${change}%)`;
+        }
+
+        markers.push({
+            time: date,
             position: 'aboveBar',
             color: '#f68410',
             shape: 'pin',
-            text: ev.title
-        }));
+            text: title + effectLabel
+        });
+
         lineSeries.setMarkers(markers);
     }
 
-    function renderEventList() {
-        const container = document.getElementById('items');
-        container.innerHTML = savedEvents.map(ev => `
-            <div class="event-item"><b>${ev.date}</b>: ${ev.title}</div>
-        `).join('');
-    }
+    // Adjust chart size on window resize
+    window.addEventListener('resize', () => {
+        chart.applyOptions({ width: document.getElementById('chart').clientWidth });
+    });
 
-    function clearData() {
-        localStorage.removeItem('myStockEvents');
-        savedEvents = [];
-        refreshMarkers();
-        renderEventList();
-    }
-
-    init();
+    initChart();
+    loadStock(); // Initial load
 </script>
 </body>
 </html>
