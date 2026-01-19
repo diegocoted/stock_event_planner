@@ -4,40 +4,310 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Event Planner</title>
-    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.1/lightweight-charts.standalone.production.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { margin-top: 0; color: #333; font-size: 24px; }
+        /* Base Styles */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f4f6f8; margin: 0; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; font-size: 24px; color: #1a1a1a; display: flex; align-items: center; gap: 10px; }
         
-        /* Chart & Controls */
-        #chart { height: 500px; width: 100%; margin: 10px 0 20px 0; border: 1px solid #eee; border-radius: 8px; position: relative; }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        /* Chart Area */
+        #chart { height: 550px; width: 100%; margin: 15px 0; border: 1px solid #e0e0e0; border-radius: 8px; position: relative; }
         
-        /* Year Buttons Bar */
-        .year-bar { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #eee; white-space: nowrap; }
-        .btn-year { padding: 6px 12px; font-size: 13px; background: #e9ecef; color: #333; border: none; border-radius: 15px; cursor: pointer; transition: 0.2s; }
-        .btn-year:hover { background: #dee2e6; }
-        .btn-year.active { background: #2962ff; color: white; }
+        /* Controls */
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        input, button { padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        button { cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        
+        /* Main Action Button */
+        .btn-primary { background: #2962ff; color: white; border: none; }
+        .btn-primary:hover { background: #1e4bd8; }
+        
+        /* Year Filter Bar */
+        .year-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 10px; border-bottom: 1px solid #eee; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .btn-year { padding: 6px 14px; font-size: 13px; background: #f1f3f5; color: #555; border: 1px solid transparent; border-radius: 20px; }
+        .btn-year:hover { background: #e9ecef; }
+        .btn-year.active { background: #2962ff; color: white; box-shadow: 0 2px 4px rgba(41, 98, 255, 0.3); }
 
-        /* Inputs */
-        input, button.main-btn { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        button.main-btn { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { opacity: 0.9; }
-        
-        /* Tables & News Box */
-        .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; margin-bottom: 25px; }
-        #status { font-size: 12px; font-weight: bold; padding: 5px 15px; border-radius: 20px; background: #eee; margin-left: auto; }
+        /* Status Badge */
+        #status { font-size: 13px; font-weight: 600; padding: 6px 15px; border-radius: 20px; background: #eee; margin-left: auto; display: inline-block; }
+
+        /* Table Section */
         .table-section { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
-        .table-container { max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; }
-        th, td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        th { background: #f8f9fa; position: sticky; top: 0; color: #666; font-weight: 600; }
-        .pct-pos { color: #28a745; font-weight: bold; }
-        .pct-neg { color: #dc3545; font-weight: bold; }
+        .table-container { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8f9fa; position: sticky; top: 0; color: #555; text-align: left; padding: 12px; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .pct-pos { color: #008a00; font-weight: bold; background: #e6f4ea; padding: 2px 6px; border-radius: 4px; }
+        .pct-neg { color: #d93025; font-weight: bold; background: #fce8e6; padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>
+    <h1>📈 Stock Event Planner</h1>
+    
+    <div class="controls">
+        <input type="text" id="symbol" placeholder="TICKER (e.g. IBM)" style="width: 130px; text-transform: uppercase; font-weight: bold;">
+        <button class="btn-primary" onclick="handleLoad()">Load Full History</button>
+        <span id="status">System Ready</span>
+    </div>
+
+    <div id="yearBar" class="year-bar">
+        </div>
+
+    <div id="chart"></div>
+
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <h4 style="margin: 0 0 15px 0; color: #444;">Add News Event & Analyze Window</h4>
+        <div class="controls" style="margin-bottom: 0;">
+            <input type="date" id="eventDate">
+            <input type="text" id="eventTitle" placeholder="Enter News Headline" style="flex-grow: 1;">
+            
+            <div style="display: flex; align-items: center; background: white; border: 1px solid #ccc; border-radius: 6px; padding: 0 8px;">
+                <span style="font-size: 12px; color: #666; margin-right: 5px;">Window:</span>
+                <input type="number" id="window" value="2" min="1" style="width: 40px; border: none; font-weight: bold; text-align: center;">
+                <span style="font-size: 12px; font-weight: bold;">Days</span>
+            </div>
+
+            <button onclick="addEvent()" style="background: #2ea043; color: white; border: none; font-weight: bold;">Plot & Calculate Effect</button>
+        </div>
+    </div>
+
+    <div class="table-section">
+        <h3 style="margin-top: 0; margin-bottom: 15px;">Stored Events</h3>
+        <div class="table-container">
+            <table id="eventTable">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Date</th>
+                        <th style="width: 10%;">Ticker</th>
+                        <th style="width: 45%;">Headline</th>
+                        <th style="width: 15%;">Window</th>
+                        <th style="width: 15%;">Outcome</th>
+                    </tr>
+                </thead>
+                <tbody id="eventBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Global Variables ---
+    let chart, lineSeries;
+    let allPriceData = [];
+    let markers = [];
+    let currentSymbol = "IBM"; // Default placeholder
+    const apiKey = 'BXEWDOIBDU02295K'; 
+
+    // --- Initialization ---
+    function initApp() {
+        console.log("App Initializing...");
+        
+        // 1. Generate Year Buttons
+        generateYearButtons();
+
+        // 2. Setup Chart
+        const chartDiv = document.getElementById('chart');
+        if (!window.LightweightCharts) {
+            chartDiv.innerHTML = "<h3 style='color:red; padding:20px;'>Error: Chart library not loaded. Check internet.</h3>";
+            return;
+        }
+
+        chart = LightweightCharts.createChart(chartDiv, {
+            width: chartDiv.clientWidth,
+            height: 550,
+            layout: { backgroundColor: '#ffffff', textColor: '#333' },
+            grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+            timeScale: { borderColor: '#e0e0e0', rightOffset: 50, barSpacing: 8 },
+            priceScale: {
+                // TRICK: Top margin 45% pushes the line chart down to the bottom half.
+                // This leaves the top half empty for your "Sticky" labels.
+                scaleMargins: { top: 0.45, bottom: 0.05 }
+            }
+        });
+
+        lineSeries = chart.addLineSeries({ 
+            color: '#2962ff', 
+            lineWidth: 2,
+            crosshairMarkerVisible: true
+        });
+
+        // 3. Handle Resize
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartDiv.clientWidth });
+        });
+    }
+
+    // --- Logic: Year Buttons (No API Calls) ---
+    function generateYearButtons() {
+        const bar = document.getElementById('yearBar');
+        bar.innerHTML = ""; // Clear existing
+        const currentYear = new Date().getFullYear();
+
+        // "ALL" Button
+        const btnAll = document.createElement('button');
+        btnAll.className = 'btn-year active';
+        btnAll.innerText = 'ALL HISTORY';
+        btnAll.id = 'btn-all';
+        btnAll.onclick = function() { applyFilter('ALL', this); };
+        bar.appendChild(btnAll);
+
+        // Last 15 Years
+        for (let y = currentYear; y >= currentYear - 15; y--) {
+            const btn = document.createElement('button');
+            btn.className = 'btn-year';
+            btn.innerText = y.toString();
+            btn.onclick = function() { applyFilter(y.toString(), this); };
+            bar.appendChild(btn);
+        }
+    }
+
+    // --- Logic: Load Data (Single API Call) ---
+    async function handleLoad() {
+        const symbolInput = document.getElementById('symbol');
+        const symbol = symbolInput.value.toUpperCase().trim();
+        const status = document.getElementById('status');
+        
+        if (!symbol) return alert("Please enter a stock ticker");
+
+        // UI Updates
+        status.innerText = "⏳ Downloading Full History...";
+        status.style.background = "#fff3cd"; // Yellow
+        
+        try {
+            // We fetch FULL history once
+            const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data["Note"]) { status.innerText = "⚠️ API Limit (Wait 60s)"; return; }
+            if (!data["Time Series (Daily)"]) { status.innerText = "❌ Ticker Not Found"; return; }
+
+            // Process Data
+            allPriceData = Object.entries(data["Time Series (Daily)"]).map(([date, values]) => ({
+                time: date,
+                value: parseFloat(values["4. close"])
+            })).sort((a, b) => a.time.localeCompare(b.time));
+
+            // Success
+            currentSymbol = symbol;
+            status.innerText = `✅ ${symbol} Loaded (${allPriceData.length} days)`;
+            status.style.background = "#d4edda"; // Green
+            status.style.color = "#155724";
+
+            // Reset View to ALL
+            document.getElementById('btn-all').click();
+
+        } catch (error) {
+            console.error(error);
+            status.innerText = "❌ Network Error";
+            status.style.background = "#f8d7da";
+        }
+    }
+
+    // --- Logic: Filter View (Instant) ---
+    function applyFilter(year, btnElement) {
+        if (allPriceData.length === 0 && year !== 'ALL') return;
+
+        // Update Buttons
+        document.querySelectorAll('.btn-year').forEach(b => b.classList.remove('active'));
+        if(btnElement) btnElement.classList.add('active');
+
+        // Filter Data
+        let filteredData = allPriceData;
+        if (year !== 'ALL') {
+            filteredData = allPriceData.filter(d => d.time.startsWith(year));
+        }
+
+        if (filteredData.length === 0 && allPriceData.length > 0) {
+            alert(`No data found for ${year}`);
+            return;
+        }
+
+        // Update Chart
+        lineSeries.setData(filteredData);
+        chart.timeScale().fitContent();
+
+        // Update Markers for this view
+        updateMarkers(year);
+    }
+
+    // --- Logic: Add Event & Calculate ---
+    function addEvent() {
+        const date = document.getElementById('eventDate').value;
+        const title = document.getElementById('eventTitle').value;
+        const win = parseInt(document.getElementById('window').value);
+
+        if (!date || !title || allPriceData.length === 0) return alert("Please load a stock and fill all fields.");
+
+        // Find index in FULL history
+        const idx = allPriceData.findIndex(p => p.time === date);
+        if (idx === -1) return alert("Date not found (Market closed or Weekend?)");
+
+        // Calculate Return
+        const targetIdx = idx + win;
+        let pctLabel = "N/A";
+        let pctVal = 0;
+
+        if (targetIdx < allPriceData.length) {
+            const startPrice = allPriceData[idx].value;
+            const endPrice = allPriceData[targetIdx].value;
+            pctVal = ((endPrice - startPrice) / startPrice) * 100;
+            pctLabel = (pctVal > 0 ? "+" : "") + pctVal.toFixed(2) + "%";
+        }
+
+        // Create Marker (Pinned High)
+        // "aboveBar" + high margin = Sticky Top Effect
+        const markerText = `${title}\n${pctLabel} (${win}d)`;
+        
+        markers.push({
+            time: date,
+            position: 'aboveBar',
+            color: '#f68410', // Orange Pin
+            shape: 'pin',
+            text: markerText,
+            size: 2 // Larger pin size
+        });
+
+        // Refresh Markers
+        const activeYear = document.querySelector('.btn-year.active').innerText;
+        // If the new event is inside the current view, we refresh, otherwise we stay
+        const filterKey = activeYear === "ALL HISTORY" ? "ALL" : activeYear;
+        
+        // Auto-switch to the event's year if "ALL" is not selected? 
+        // No, keep current view, but if "ALL" is selected, update it.
+        updateMarkers(filterKey);
+
+        // Add to Table
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${date}</td>
+            <td><strong>${currentSymbol}</strong></td>
+            <td>${title}</td>
+            <td>${win} Days</td>
+            <td><span class="${pctVal >= 0 ? 'pct-pos' : 'pct-neg'}">${pctLabel}</span></td>
+        `;
+        document.getElementById('eventBody').prepend(row);
+    }
+
+    function updateMarkers(yearContext) {
+        // Sort markers strictly by date to prevent errors
+        markers.sort((a, b) => a.time.localeCompare(b.time));
+
+        // Filter visible markers
+        const visibleMarkers = markers.filter(m => {
+            if (yearContext === 'ALL') return true;
+            return m.time.startsWith(yearContext);
+        });
+        
+        lineSeries.setMarkers(visibleMarkers);
+    }
+
+    // Start App
+    window.onload = initApp;
+
+</script>
+</body>
+</html>
