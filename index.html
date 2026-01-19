@@ -3,38 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Event Planner - Compact</title>
+    <title>Stock Event Planner</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f8f9fa; margin: 0; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; color: #333; font-size: 24px; display: flex; align-items: center; gap: 10px; }
         #chart { height: 450px; width: 100%; margin: 15px 0; border: 1px solid #eee; border-radius: 8px; }
-        .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
         input, button { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .news-box { background: #f0f4f8; padding: 15px; border-radius: 10px; border: 1px solid #d1d9e0; }
-        #status { font-size: 12px; font-weight: bold; padding: 5px 12px; border-radius: 20px; background: #eee; }
-        .window-wrapper { display: flex; align-items: center; background: white; border: 1px solid #ddd; padding: 0 8px; border-radius: 6px; }
+        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #1e4bd8; }
+        .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; }
+        #status { font-size: 12px; font-weight: bold; padding: 5px 12px; border-radius: 20px; background: #eee; margin-left: auto; }
+        .window-wrapper { display: flex; align-items: center; background: white; border: 1px solid #ddd; padding: 0 10px; border-radius: 6px; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <h1>📈 Stock Event Planner</h1>
+    
     <div class="controls">
         <input type="text" id="symbol" placeholder="TICKER" style="width: 120px; text-transform: uppercase;">
-        <button onclick="handleLoad()">Load Stock (Compact)</button>
+        <button onclick="handleLoad()">Load Stock</button>
         <span id="status">Ready</span>
     </div>
 
     <div id="chart"></div>
 
     <div class="news-box">
+        <h4 style="margin-top:0; margin-bottom:15px;">Add News Event</h4>
         <div class="controls">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="Headline..." style="flex-grow: 1;">
+            <input type="text" id="eventTitle" placeholder="Headline (e.g. CEO Resigns)" style="flex-grow: 1;">
             <div class="window-wrapper">
-                <input type="number" id="window" value="2" min="1" max="100" style="width: 40px; border: none;">
-                <span style="font-size: 12px; font-weight: bold;">Days</span>
+                <input type="number" id="window" value="2" min="1" max="50" style="width: 40px; border: none;">
+                <span style="font-size: 12px; font-weight: bold; color: #666; margin-left: 5px;">Days</span>
             </div>
             <button onclick="addEvent()" style="background: #28a745;">Plot & Calculate</button>
         </div>
@@ -51,15 +56,11 @@
             width: chartElement.clientWidth,
             height: 450,
             layout: { backgroundColor: '#ffffff', textColor: '#333' },
-            timeScale: { borderColor: '#eee', rightOffset: 5, barSpacing: 6 },
+            timeScale: { borderColor: '#eee', rightOffset: 5, barSpacing: 8 },
         });
         lineSeries = chart.addLineSeries({ 
             color: '#2962ff', 
-            lineWidth: 2,
-            // Marker configuration to help them stay visible
-            markers: {
-                size: 10
-            }
+            lineWidth: 2 
         });
     }
 
@@ -70,7 +71,7 @@
         const status = document.getElementById('status');
         const apiKey = 'BXEWDOIBDU02295K';
         
-        // REVERTED TO COMPACT MODE
+        // Compact mode for faster/more reliable loading
         const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
 
         status.innerText = "⏳ Loading...";
@@ -80,7 +81,7 @@
             const response = await fetch(url);
             const data = await response.json();
             
-            if (data["Note"]) { status.innerText = "⚠️ API Busy (60s)"; return; }
+            if (data["Note"]) { status.innerText = "⚠️ API Busy"; return; }
 
             const dailyData = data["Time Series (Daily)"];
             if (!dailyData) {
@@ -108,25 +109,25 @@
         const title = document.getElementById('eventTitle').value;
         const win = parseInt(document.getElementById('window').value);
 
-        if(!date || !title || priceData.length === 0) return alert("Load ticker and fill all fields.");
+        if(!date || !title || priceData.length === 0) return alert("Please load a stock and fill all fields.");
 
         const idx = priceData.findIndex(p => p.time === date);
-        if(idx === -1) return alert("Date not found in current 100-day window.");
+        if(idx === -1) return alert("Date not found in current data window.");
 
         let label = title;
         const targetIdx = idx + win;
 
-        // SINGLE PERCENTAGE CALCULATION
+        // Displaying only the single selected window percentage
         if (targetIdx < priceData.length) {
             const startVal = priceData[idx].value;
             const endVal = priceData[targetIdx].value;
             const pct = (((endVal - startVal) / startVal) * 100).toFixed(2);
             label += ` (${pct > 0 ? '+' : ''}${pct}% - ${win} days)`;
         } else {
-            label += " (Not enough data for window)";
+            label += " (Window exceeds available data)";
         }
 
-        // POSITION ABOVEBAR WITH PIN SHAPE
+        // 'aboveBar' position with 'pin' shape creates the line effect down to the chart
         markers.push({ 
             time: date, 
             position: 'aboveBar', 
@@ -135,12 +136,12 @@
             text: label 
         });
         
-        // Sorting markers by time to prevent rendering issues
         markers.sort((a, b) => a.time.localeCompare(b.time));
         lineSeries.setMarkers(markers);
     }
 
     window.onload = initChart;
+    window.onresize = () => { chart.applyOptions({ width: document.getElementById('chart').clientWidth }); };
 </script>
 </body>
 </html>
