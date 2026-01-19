@@ -2,39 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock News Plotter</title>
+    <title>Stock Event Planner - Full History</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        #chart { height: 450px; width: 100%; border: 1px solid #eee; }
-        input, button { padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
-        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .news-section { margin-top: 20px; padding: 15px; background: #eef2f3; border-radius: 8px; }
-        #status { font-size: 13px; color: #666; margin-left: 10px; align-self: center; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        #chart { height: 500px; width: 100%; margin: 20px 0; border: 1px solid #eee; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        input, button { padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        button { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #1e4bd8; }
+        .news-box { background: #f0f4f8; padding: 15px; border-radius: 8px; border: 1px solid #e1e8ed; }
+        #status { font-size: 13px; color: #666; font-weight: bold; margin-left: auto; }
+        .unit-label { font-size: 14px; color: #555; margin-left: -5px; margin-right: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📈 Stock Event Planner</h2>
-    
+    <h2 style="margin-top:0">📈 Stock Event Planner</h2>
     <div class="controls">
-        <input type="text" id="symbol" value="AAPL" placeholder="Ticker (e.g. TSLA)">
+        <input type="text" id="symbol" value="AAPL" style="width: 100px; text-transform: uppercase;">
         <button onclick="loadStock()">Update Chart</button>
         <span id="status">Ready</span>
     </div>
 
     <div id="chart"></div>
 
-    <div class="news-section">
-        <h4>Manual News Input</h4>
+    <div class="news-box">
+        <h4 style="margin-top:0; margin-bottom:10px;">Add News Event</h4>
         <div class="controls">
             <input type="date" id="eventDate">
-            <input type="text" id="eventTitle" placeholder="News Title (e.g. New Product Launch)" style="flex-grow:1">
-            <input type="number" id="window" value="3" style="width: 60px;" title="Days to calculate effect">
-            <button onclick="addEvent()" style="background: #00c853;">Plot & Calculate</button>
+            <input type="text" id="eventTitle" placeholder="News Summary (e.g. Earnings Call)" style="flex-grow: 1;">
+            <div style="display:flex; align-items:center;">
+                <input type="number" id="window" value="3" style="width: 60px;" min="1" max="10">
+                <span class="unit-label">Days</span>
+            </div>
+            <button onclick="addEvent()" style="background: #28a745;">Plot & Calculate</button>
         </div>
     </div>
 </div>
@@ -43,94 +47,97 @@
     let chart, lineSeries, priceData = [];
     let markers = [];
 
-    // Initialize Chart
-    function init() {
-        const chartDiv = document.getElementById('chart');
-        chart = LightweightCharts.createChart(chartDiv, {
-            width: chartDiv.clientWidth,
-            height: 450,
-            layout: { background: { color: '#ffffff' }, textColor: '#333' },
-            timeScale: { borderColor: '#eee', timeVisible: true }
+    function initChart() {
+        const chartElement = document.getElementById('chart');
+        chart = LightweightCharts.createChart(chartElement, {
+            width: chartElement.clientWidth,
+            height: 500,
+            layout: { backgroundColor: '#ffffff', textColor: '#333' },
+            timeScale: { borderColor: '#eee', rightOffset: 12, barSpacing: 3, minBarSpacing: 0.5 },
         });
         lineSeries = chart.addLineSeries({ color: '#2962ff', lineWidth: 2 });
-        loadStock();
     }
 
     async function loadStock() {
         const symbol = document.getElementById('symbol').value.toUpperCase();
+        const apiKey = 'LJH4QALA5R7SC0E9'; 
         const status = document.getElementById('status');
         
-        // YOUR API KEY INTEGRATED HERE
-        const apiKey = 'LJH4QALA5R7SC0E9'; 
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
+        // Changed to outputsize=full to allow full history navigation
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
 
-        status.innerText = "Loading data...";
+        status.innerText = "Fetching Full History...";
+        status.style.color = "orange";
 
         try {
-            const response = await fetch(url);
-            const data = await response.json();
-
-            // Error handling for API limits
-            if (data["Note"]) {
-                status.innerText = "Error: API Limit (Wait 1 minute)";
-                return;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data["Note"]) { 
+                status.innerText = "API Limit Reached! Wait 60s."; 
+                status.style.color = "red"; 
+                return; 
             }
-
+            
             const daily = data["Time Series (Daily)"];
-            if (!daily) {
-                status.innerText = "Error: Invalid Ticker";
-                return;
+            if (!daily) { 
+                status.innerText = "Ticker Error."; 
+                status.style.color = "red";
+                return; 
             }
 
-            // Transform data for the chart
-            priceData = Object.keys(daily).map(date => ({
-                time: date,
-                value: parseFloat(daily[date]["4. close"])
-            })).sort((a, b) => a.time.localeCompare(b.time));
+            priceData = Object.keys(daily).map(d => ({
+                time: d,
+                value: parseFloat(daily[d]["4. close"])
+            })).sort((a,b) => a.time.localeCompare(b.time));
 
             lineSeries.setData(priceData);
             chart.timeScale().fitContent();
-            status.innerText = "Loaded: " + symbol;
-
-        } catch (err) {
+            status.innerText = "Success: Full " + symbol + " History Loaded";
+            status.style.color = "green";
+        } catch (e) {
             status.innerText = "Connection Error";
+            status.style.color = "red";
         }
     }
 
     function addEvent() {
         const date = document.getElementById('eventDate').value;
         const title = document.getElementById('eventTitle').value;
-        const windowSize = parseInt(document.getElementById('window').value);
+        const win = parseInt(document.getElementById('window').value);
 
-        if (!date || !title) return alert("Enter date and title");
+        if(!date || !title) return alert("Select date and title");
 
-        // Calculate % change over the window
-        const eventIdx = priceData.findIndex(p => p.time === date);
-        let effectLabel = "";
+        const idx = priceData.findIndex(p => p.time === date);
+        if(idx === -1) return alert("Date not found in price history. Try selecting a trading day.");
 
-        if (eventIdx !== -1 && (eventIdx + windowSize) < priceData.length) {
-            const startPrice = priceData[eventIdx].value;
-            const endPrice = priceData[eventIdx + windowSize].value;
-            const diff = ((endPrice - startPrice) / startPrice * 100).toFixed(2);
-            effectLabel = ` (${diff > 0 ? '+' : ''}${diff}%)`;
+        let effects = [];
+        const startPrice = priceData[idx].value;
+
+        // Calculate effect for each individual day in the window
+        for (let i = 1; i <= win; i++) {
+            if (idx + i < priceData.length) {
+                const currentPrice = priceData[idx + i].value;
+                const chg = ((currentPrice - startPrice) / startPrice * 100).toFixed(2);
+                effects.push(`${i}d: ${chg > 0 ? '+' : ''}${chg}%`);
+            }
         }
 
-        markers.push({
-            time: date,
-            position: 'aboveBar',
-            color: '#f68410',
-            shape: 'pin',
-            text: title + effectLabel
-        });
+        const fullLabel = title + " (" + effects.join(", ") + ")";
 
+        markers.push({ 
+            time: date, 
+            position: 'aboveBar', 
+            color: '#f68410', 
+            shape: 'pin', 
+            text: fullLabel 
+        });
+        
         lineSeries.setMarkers(markers);
     }
 
-    window.addEventListener('resize', () => {
-        chart.applyOptions({ width: document.querySelector('.container').clientWidth - 50 });
-    });
-
-    init();
+    window.onload = () => { initChart(); loadStock(); };
+    window.onresize = () => { chart.applyOptions({ width: document.getElementById('chart').clientWidth }); };
 </script>
 </body>
 </html>
