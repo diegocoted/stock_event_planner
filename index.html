@@ -6,12 +6,12 @@
     <title>Stock Event Planner</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f8f9fa; margin: 0; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h1 { margin-top: 0; color: #333; font-size: 24px; }
         
         /* Chart & Controls */
-        #chart { height: 500px; width: 100%; margin: 10px 0 20px 0; border: 1px solid #eee; border-radius: 8px; }
+        #chart { height: 500px; width: 100%; margin: 10px 0 20px 0; border: 1px solid #eee; border-radius: 8px; position: relative; }
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
         
         /* Year Buttons Bar */
@@ -23,6 +23,7 @@
         /* Inputs */
         input, button.main-btn { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
         button.main-btn { background: #2962ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
         
         /* Tables & News Box */
         .news-box { background: #f0f4f8; padding: 20px; border-radius: 10px; border: 1px solid #d1d9e0; margin-bottom: 25px; }
@@ -35,3 +36,8 @@
         .pct-pos { color: #28a745; font-weight: bold; }
         .pct-neg { color: #dc3545; font-weight: bold; }
     </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>
